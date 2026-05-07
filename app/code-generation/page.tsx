@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { getStoredProjectId } from "@/lib/project-context";
 import { sampleScript, sampleTestCases } from "@/lib/sample-data";
 import { sampleGeneratedAutomations, samplePythonScript } from "@/lib/phase2-sample-data";
 import type { AutomationLanguage, GeneratedScript, TestCase } from "@/lib/types";
@@ -92,9 +93,10 @@ export default function CodeGenerationPage() {
       return;
     }
     const ownerId = user.data.user.id;
+    const projectId = getStoredProjectId();
 
     await supabase.from("generated_automation").insert({
-      id: activeScript.id,
+      ...(projectId ? { project_id: projectId } : {}),
       owner_id: ownerId,
       name: activeScript.name,
       language: activeScript.language ?? language,

@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Bot, CheckCircle2, FileText, FolderPlus, Gauge, UploadCloud } from "lucide-react";
+import { ArrowRight, Bot, CheckCircle2, FileText, FolderPlus, Gauge, Loader2, UploadCloud } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { sampleAnalysis, sampleDocuments, sampleRequirements, sampleTestCases } from "@/lib/sample-data";
 import type { Project, RequirementAnalysis, TestCase, UploadedDocument } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { isUuid, sanitizeProject } from "@/lib/project-context";
 
 const defaultProject: Project = {
-  id: "sample-project",
   name: "Customer portal QA initiative",
   description: "Sample project for requirements analysis and automation generation."
 };
@@ -28,15 +28,51 @@ export default function DashboardPage() {
   const [testCases, setTestCases] = useState<TestCase[]>(sampleTestCases);
   const [documents, setDocuments] = useState<UploadedDocument[]>(sampleDocuments);
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setProject(readJson(appStorageKeys.project, defaultProject));
+    const storedProject = sanitizeProject(readJson(appStorageKeys.project, defaultProject));
+    setProject(storedProject);
+    writeJson(appStorageKeys.project, storedProject);
     setAnalysis(readJson(appStorageKeys.analysis, sampleAnalysis));
     setTestCases(readJson(appStorageKeys.testCases, sampleTestCases));
     setDocuments(readJson(appStorageKeys.documents, sampleDocuments));
     if (!window.localStorage.getItem(appStorageKeys.requirements)) {
       writeJson(appStorageKeys.requirements, sampleRequirements);
     }
+
+    async function loadSupabaseProject() {
+      const supabase = createSupabaseBrowserClient();
+      if (!supabase) {
+        return;
+      }
+
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) {
+        return;
+      }
+
+      const result = await supabase
+        .from("projects")
+        .select("id, name, description, created_at")
+        .eq("owner_id", user.data.user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (result.data) {
+        const savedProject: Project = {
+          id: result.data.id,
+          name: result.data.name,
+          description: result.data.description,
+          created_at: result.data.created_at
+        };
+        setProject(savedProject);
+        writeJson(appStorageKeys.project, savedProject);
+      }
+    }
+
+    void loadSupabaseProject();
   }, []);
 
   useEffect(() => {
@@ -53,36 +89,81 @@ export default function DashboardPage() {
   async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    setSaving(true);
+
+    const projectName = name.trim();
+    const projectDescription = description.trim();
+    if (!projectName) {
+      setMessage("Enter a project name before saving.");
+      setSaving(false);
+      return;
+    }
+
     const nextProject = {
-      id: project.id || crypto.randomUUID(),
-      name,
-      description
+      id: isUuid(project.id) ? project.id : undefined,
+      name: projectName,
+      description: projectDescription
     };
     let nextMessage = "Project saved.";
 
-    const supabase = createSupabaseBrowserClient();
-    if (supabase) {
-      const user = await supabase.auth.getUser();
-      if (user.data.user) {
-        const ownerId = user.data.user.id;
-        const payload = {
-          id: nextProject.id,
-          owner_id: ownerId,
-          name: nextProject.name,
-          description: nextProject.description
-        };
-        const result = await supabase.from("projects").upsert(payload).select("id, name, description").single();
-        if (result.error) {
-          nextMessage = result.error.message;
-        } else if (result.data) {
-          nextProject.id = result.data.id;
+    try {
+      const supabase = createSupabaseBrowserClient();
+      if (supabase) {
+        const user = await supabase.auth.getUser();
+        if (!user.data.user) {
+          setMessage("Sign in before saving a project to Supabase.");
+          setSaving(false);
+          return;
         }
+
+        const ownerId = user.data.user.id;
+        const result = nextProject.id
+          ? await supabase
+              .from("projects")
+              .update({
+                name: nextProject.name,
+                description: nextProject.description,
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", nextProject.id)
+              .eq("owner_id", ownerId)
+              .select("id, name, description")
+              .single()
+          : await supabase
+              .from("projects")
+              .insert({
+                owner_id: ownerId,
+                name: nextProject.name,
+                description: nextProject.description
+              })
+              .select("id, name, description")
+              .single();
+
+        if (result.error) {
+          setMessage(result.error.message);
+          setSaving(false);
+          return;
+        }
+
+        if (result.data) {
+          nextProject.id = result.data.id;
+          nextProject.name = result.data.name;
+          nextProject.description = result.data.description;
+          nextMessage = "Project saved with Supabase project ID.";
+        }
+      } else {
+        nextMessage = "Project saved locally. Configure Supabase to persist it.";
       }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Project save failed.");
+      setSaving(false);
+      return;
     }
 
     setProject(nextProject);
     writeJson(appStorageKeys.project, nextProject);
     setMessage(nextMessage);
+    setSaving(false);
   }
 
   return (
@@ -132,7 +213,9 @@ export default function DashboardPage() {
               <span className="mb-1 block text-sm font-semibold text-slate-700">Description</span>
               <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
             </label>
-            <Button>Save Project</Button>
+            <Button disabled={saving} icon={saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : undefined}>
+              {saving ? "Saving Project" : "Save Project"}
+            </Button>
             {message ? <p className="rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
           </div>
         </form>

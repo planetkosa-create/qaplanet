@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { getStoredProjectId, isUuid } from "@/lib/project-context";
 import { sampleAnalysisItems, sampleRequirementSources } from "@/lib/phase2-sample-data";
 import type { AnalysisItem, AnalysisItemType, RequirementSource } from "@/lib/types";
 
@@ -50,17 +51,17 @@ export default function AnalysisPage() {
       return;
     }
     const user = await supabase.auth.getUser();
-   if (!user.data.user) {
-  return;
-}
-const ownerId = user.data.user.id;
+    if (!user.data.user) {
+      return;
+    }
+    const ownerId = user.data.user.id;
+    const projectId = getStoredProjectId();
 
-await supabase.from("analysis_items").insert(
-  nextItems.map((item) => ({
-    id: item.id,
-    owner_id: ownerId,
-
-        requirement_source_id: item.requirementSourceId,
+    await supabase.from("analysis_items").insert(
+      nextItems.map((item) => ({
+        ...(projectId ? { project_id: projectId } : {}),
+        owner_id: ownerId,
+        ...(isUuid(item.requirementSourceId) ? { requirement_source_id: item.requirementSourceId } : {}),
         item_type: item.itemType,
         title: item.title,
         description: item.description,

@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Textarea } from "@/components/ui/field";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { getStoredProjectId } from "@/lib/project-context";
 import { sampleTestCases } from "@/lib/sample-data";
 import { sampleAnalysisItems, sampleRequirementSources } from "@/lib/phase2-sample-data";
 import type { AnalysisItem, Priority, TestCase, TestCaseStatus, TestCaseType } from "@/lib/types";
@@ -59,10 +60,11 @@ export default function TestCasesPage() {
       return;
     }
     const ownerId = user.data.user.id;
+    const projectId = getStoredProjectId();
 
     await supabase.from("test_cases").insert(
       nextCases.map((testCase) => ({
-        id: testCase.id,
+        ...(projectId ? { project_id: projectId } : {}),
         owner_id: ownerId,
         test_case_id: testCase.testCaseId,
         requirement_reference: testCase.requirementReference,

@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { appStorageKeys, readJson } from "@/lib/storage";
+import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { getStoredProjectId } from "@/lib/project-context";
 import { sampleTestCases } from "@/lib/sample-data";
 import { buildSampleTraceability, sampleAnalysisItems, sampleAutomationAssessments } from "@/lib/phase2-sample-data";
 import type { AnalysisItem, AutomationAssessment, TestCase, TraceabilityRow } from "@/lib/types";
@@ -78,6 +80,7 @@ export default function ExportsPage() {
       await downloadWorkbook({ [scope]: rows }, `${fileBase}.xlsx`);
     }
 
+    await saveExportMetadata(scope, format, `${fileBase}.${extensionForFormat(format)}`, rows.length);
     setMessage(`${scope} exported as ${format}.`);
   }
 
@@ -115,6 +118,36 @@ export default function ExportsPage() {
       {message ? <p className="mt-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
     </AppShell>
   );
+}
+
+async function saveExportMetadata(scope: ExportScope, format: ExportFormat, fileName: string, rowCount: number) {
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) {
+    return;
+  }
+
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) {
+    return;
+  }
+
+  const ownerId = user.data.user.id;
+  const projectId = getStoredProjectId();
+  await supabase.from("exports").insert({
+    ...(projectId ? { project_id: projectId } : {}),
+    owner_id: ownerId,
+    export_type: format.toLowerCase(),
+    export_scope: scope,
+    export_format: format,
+    row_count: rowCount,
+    file_name: fileName
+  });
+}
+
+function extensionForFormat(format: ExportFormat) {
+  if (format === "Markdown") return "md";
+  if (format === "Excel") return "xlsx";
+  return format.toLowerCase();
 }
 
 function rowsForScope(

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, ReadinessBadge } from "@/components/ui/badge";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { getStoredProjectId } from "@/lib/project-context";
 import { sampleTestCases } from "@/lib/sample-data";
 import { sampleAutomationAssessments } from "@/lib/phase2-sample-data";
 import type { AutomationAssessment, TestCase } from "@/lib/types";
@@ -62,10 +63,11 @@ export default function AutomationReadinessPage() {
       return;
     }
     const ownerId = user.data.user.id;
+    const projectId = getStoredProjectId();
 
     await supabase.from("automation_assessments").insert(
       next.map((assessment) => ({
-        id: assessment.id,
+        ...(projectId ? { project_id: projectId } : {}),
         owner_id: ownerId,
         test_case_ref: assessment.testCaseId,
         readiness: assessment.readiness,

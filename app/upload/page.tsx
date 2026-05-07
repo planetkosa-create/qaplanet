@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase";
+import { getStoredProjectId } from "@/lib/project-context";
 import { sampleRequirements } from "@/lib/sample-data";
 import { sampleRequirementSources } from "@/lib/phase2-sample-data";
 import type { RequirementSource } from "@/lib/types";
@@ -40,20 +41,21 @@ export default function UploadPage() {
     writeJson(appStorageKeys.requirements, nextSources.map((source) => source.extractedText).join("\n\n"));
   }
 
-  async function saveSourceToSupabase(source: RequirementSource) {
+  async function saveSourceToSupabase(source: RequirementSource): Promise<RequirementSource> {
     const supabase = createSupabaseBrowserClient();
     if (!configured || !supabase) {
-      return;
+      return source;
     }
 
     const user = await supabase.auth.getUser();
     if (!user.data.user) {
-      return;
+      return source;
     }
     const ownerId = user.data.user.id;
+    const projectId = getStoredProjectId();
 
-    await supabase.from("requirement_sources").insert({
-      id: source.id,
+    const result = await supabase.from("requirement_sources").insert({
+      ...(projectId ? { project_id: projectId } : {}),
       owner_id: ownerId,
       file_name: source.fileName,
       source_type: source.sourceType,
@@ -62,7 +64,17 @@ export default function UploadPage() {
       storage_path: source.storagePath,
       extracted_text: source.extractedText,
       processing_status: source.processingStatus
-    });
+    }).select("id, project_id").single();
+
+    if (result.data) {
+      return {
+        ...source,
+        id: result.data.id,
+        projectId: result.data.project_id ?? source.projectId
+      };
+    }
+
+    return source;
   }
 
   async function addManualSource() {
@@ -81,9 +93,9 @@ export default function UploadPage() {
       processingStatus: "Analysis Ready",
       createdAt: new Date().toISOString()
     };
-    const nextSources = [source, ...sources];
+    const savedSource = await saveSourceToSupabase(source);
+    const nextSources = [savedSource, ...sources];
     persist(nextSources);
-    await saveSourceToSupabase(source);
     setMessage("Manual requirement source saved and ready for analysis.");
   }
 
@@ -136,8 +148,8 @@ export default function UploadPage() {
           processingStatus: data.text ? "Analysis Ready" : "Failed",
           createdAt: new Date().toISOString()
         };
-        nextSources.unshift(source);
-        await saveSourceToSupabase(source);
+        const savedSource = await saveSourceToSupabase(source);
+        nextSources.unshift(savedSource);
       }
 
       persist(nextSources);
