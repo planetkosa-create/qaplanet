@@ -284,12 +284,27 @@ create table if not exists public.generated_automation (
   project_id uuid references public.projects(id) on delete cascade,
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
-  language text not null check (language in ('typescript', 'python')),
+  language text not null check (language in ('typescript', 'python', 'gherkin')),
   framework text not null default 'Playwright',
   test_case_ids text[] not null default '{}',
   code text not null,
   created_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'generated_automation_language_check'
+      and conrelid = 'public.generated_automation'::regclass
+  ) then
+    alter table public.generated_automation drop constraint generated_automation_language_check;
+  end if;
+end $$;
+
+alter table public.generated_automation
+add constraint generated_automation_language_check
+check (language in ('typescript', 'python', 'gherkin'));
 
 alter table public.exports alter column project_id drop not null;
 do $$
