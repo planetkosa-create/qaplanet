@@ -11,7 +11,7 @@ export type TestCaseType =
   | "Integration"
   | "Regression";
 export type AutomationReadiness = "Automatable" | "Needs API/Data" | "Manual Only";
-export type TestCaseStatus = "Draft" | "Approved" | "Rejected";
+export type TestCaseStatus = "Draft" | "In Review" | "Approved" | "Rejected" | "Needs Update";
 export type ProcessingStatus = "Uploaded" | "Extracted" | "Analysis Ready" | "Failed";
 export type AnalysisItemType =
   | "Business Rule"
@@ -25,12 +25,18 @@ export type AnalysisItemType =
   | "Data Requirement";
 export type RecommendedFramework = "Playwright" | "API" | "Manual";
 export type AutomationLanguage = "typescript" | "python";
+export type CoverageStatus = "Covered" | "Partial" | "Not Covered";
 
 export type Project = {
   id?: string;
   name: string;
+  clientName?: string | null;
+  applicationName?: string | null;
+  releaseName?: string | null;
   description: string | null;
+  status?: "Active" | "Archived" | "active" | "archived";
   created_at?: string;
+  updated_at?: string;
 };
 
 export type RequirementAnalysis = {
@@ -68,6 +74,12 @@ export type TestCase = {
   recommendedFramework?: RecommendedFramework;
   status: TestCaseStatus;
   approvalStatus?: TestCaseStatus;
+  reviewNotes?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  updatedAt?: string;
   analysisItemIds?: string[];
   requirementSourceIds?: string[];
 };
@@ -127,12 +139,26 @@ export type AutomationAssessment = {
 };
 
 export type TraceabilityRow = {
+  requirementId?: string;
+  requirementTitle?: string;
   requirementReference: string;
   sourceDocument: string;
   analysisItem: string;
   testCaseId: string;
   testCaseTitle: string;
+  priority?: Priority;
+  testType?: TestCaseType;
   automationStatus: AutomationReadiness;
   generatedScript: string;
   approvalStatus: TestCaseStatus;
+  coverageStatus?: CoverageStatus;
+  exportStatus?: "Not Exported" | "Exported";
+};
+
+export type ExportHistoryItem = {
+  id: string;
+  fileName: string;
+  exportType: string;
+  createdAt: string;
+  rowCount?: number;
 };

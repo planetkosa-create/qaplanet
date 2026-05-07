@@ -11,6 +11,7 @@ export const appStorageKeys = {
   traceabilityRows: "qaplanet.traceabilityRows",
   selectedTestCases: "qaplanet.selectedTestCases",
   generatedScript: "qaplanet.generatedScript",
+  exportHistory: "qaplanet.exportHistory",
   localDataCleared: "qaplanet.localDataCleared"
 } as const;
 

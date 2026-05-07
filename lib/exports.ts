@@ -48,7 +48,8 @@ export function testCasesToCsv(testCases: TestCase[]) {
     "Automation Candidate",
     "Automation Readiness",
     "Automation Notes",
-    "Status"
+    "Status",
+    "Review Notes"
   ];
 
   const rows = testCases.map((testCase) => [
@@ -64,7 +65,8 @@ export function testCasesToCsv(testCases: TestCase[]) {
     testCase.automationCandidate ? "Yes" : "No",
     testCase.readiness,
     testCase.automationNotes,
-    testCase.status
+    testCase.approvalStatus ?? testCase.status,
+    testCase.reviewNotes ?? ""
   ]);
 
   return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
@@ -130,23 +132,33 @@ export function readinessToCsv(items: AutomationAssessment[]) {
 export function traceabilityToCsv(rows: TraceabilityRow[]) {
   const headers = [
     "Requirement Reference",
+    "Requirement Title",
     "Source Document",
     "Analysis Item",
     "Test Case ID",
     "Test Case Title",
+    "Priority",
+    "Test Type",
     "Automation Status",
     "Generated Script",
-    "Approval Status"
+    "Approval Status",
+    "Coverage Status",
+    "Export Status"
   ];
   const values = rows.map((row) => [
     row.requirementReference,
+    row.requirementTitle ?? row.requirementReference,
     row.sourceDocument,
     row.analysisItem,
     row.testCaseId,
     row.testCaseTitle,
+    row.priority ?? "",
+    row.testType ?? "",
     row.automationStatus,
     row.generatedScript,
-    row.approvalStatus
+    row.approvalStatus,
+    row.coverageStatus ?? "",
+    row.exportStatus ?? ""
   ]);
   return [headers, ...values].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
