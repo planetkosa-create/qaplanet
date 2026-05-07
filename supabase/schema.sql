@@ -97,7 +97,7 @@ create table if not exists public.exports (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  export_type text not null check (export_type in ('markdown', 'csv', 'excel')),
+  export_type text not null check (export_type in ('markdown', 'csv', 'json', 'excel')),
   file_name text not null,
   storage_path text,
   created_at timestamptz not null default now()
@@ -292,6 +292,20 @@ create table if not exists public.generated_automation (
 );
 
 alter table public.exports alter column project_id drop not null;
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'exports_export_type_check'
+      and conrelid = 'public.exports'::regclass
+  ) then
+    alter table public.exports drop constraint exports_export_type_check;
+  end if;
+end $$;
+
+alter table public.exports
+add constraint exports_export_type_check
+check (export_type in ('markdown', 'csv', 'json', 'excel'));
 alter table public.exports add column if not exists export_scope text;
 alter table public.exports add column if not exists export_format text;
 alter table public.exports add column if not exists row_count integer not null default 0;
