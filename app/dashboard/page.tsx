@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge, ReadinessBadge } from "@/components/ui/badge";
 import { Input, Textarea } from "@/components/ui/field";
+import { ResetProjectWorkflow } from "@/components/reset-project-workflow";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { sampleAnalysis, sampleDocuments, sampleRequirements, sampleTestCases } from "@/lib/sample-data";
 import type { Project, RequirementAnalysis, TestCase, UploadedDocument } from "@/lib/types";
@@ -85,6 +86,24 @@ export default function DashboardPage() {
     const approved = testCases.filter((testCase) => testCase.status === "Approved").length;
     return { automatable, approved };
   }, [testCases]);
+
+  function resetDashboardState() {
+    setAnalysis({
+      summary: "",
+      businessRules: [],
+      userStories: [],
+      acceptanceCriteria: [],
+      risks: [],
+      gaps: [],
+      assumptions: [],
+      actors: [],
+      systems: [],
+      dataRequirements: []
+    });
+    setTestCases([]);
+    setDocuments([]);
+    setMessage("Project workflow has been reset successfully.");
+  }
 
   async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -213,9 +232,12 @@ export default function DashboardPage() {
               <span className="mb-1 block text-sm font-semibold text-slate-700">Description</span>
               <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
             </label>
-            <Button disabled={saving} icon={saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : undefined}>
-              {saving ? "Saving Project" : "Save Project"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={saving} icon={saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : undefined}>
+                {saving ? "Saving Project" : "Save Project"}
+              </Button>
+              <ResetProjectWorkflow projectId={project.id} onReset={resetDashboardState} compact />
+            </div>
             {message ? <p className="rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
           </div>
         </form>

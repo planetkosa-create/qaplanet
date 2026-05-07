@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { hasSupabaseConfig } from "@/lib/supabase";
+import { ResetProjectWorkflow } from "@/components/reset-project-workflow";
 
 const envVars = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -76,6 +77,19 @@ export default function SettingsPage() {
             </Button>
           </div>
           {cleared ? <p className="mt-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">Local QAplanet data cleared.</p> : null}
+        </div>
+
+        <div className="card p-5 xl:col-span-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-950">Project Data Management</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                Reset the current project workflow when you want to start fresh while keeping the project name and description.
+                This clears requirement sources, AI analysis items, generated test cases, automation scripts, and export records for the selected project only.
+              </p>
+            </div>
+            <ResetProjectWorkflow />
+          </div>
         </div>
       </section>
     </AppShell>
