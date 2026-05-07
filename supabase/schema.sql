@@ -61,7 +61,7 @@ create table if not exists public.test_cases (
   steps jsonb not null default '[]',
   expected_result text not null,
   priority text not null check (priority in ('Critical', 'High', 'Medium', 'Low')),
-  type text not null check (type in ('Functional', 'Negative', 'Edge', 'Validation', 'Role-based', 'Integration', 'Regression')),
+  type text not null check (type in ('Functional', 'Negative', 'Edge', 'Validation', 'Security', 'Accessibility', 'Performance', 'Role-based', 'Integration', 'Regression')),
   requirement_reference text,
   automation_candidate boolean not null default false,
   automation_notes text,
@@ -261,7 +261,7 @@ end $$;
 
 alter table public.test_cases
 add constraint test_cases_type_check
-check (type in ('Functional', 'Negative', 'Edge', 'Validation', 'Security', 'Role-based', 'Integration', 'Regression'));
+check (type in ('Functional', 'Negative', 'Edge', 'Validation', 'Security', 'Accessibility', 'Performance', 'Role-based', 'Integration', 'Regression'));
 alter table public.test_cases add column if not exists title text;
 alter table public.test_cases add column if not exists test_type text;
 alter table public.test_cases add column if not exists automation_status text;
