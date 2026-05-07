@@ -64,9 +64,10 @@ export default function DashboardPage() {
     if (supabase) {
       const user = await supabase.auth.getUser();
       if (user.data.user) {
+        const ownerId = user.data.user.id;
         const payload = {
           id: nextProject.id,
-          owner_id: user.data.user.id,
+          owner_id: ownerId,
           name: nextProject.name,
           description: nextProject.description
         };
