@@ -50,14 +50,16 @@ export default function AnalysisPage() {
       return;
     }
     const user = await supabase.auth.getUser();
-    if (!user.data.user) {
-      return;
-    }
+   if (!user.data.user) {
+  return;
+}
+const ownerId = user.data.user.id;
 
-    await supabase.from("analysis_items").insert(
-      nextItems.map((item) => ({
-        id: item.id,
-        owner_id: user.data.user.id,
+await supabase.from("analysis_items").insert(
+  nextItems.map((item) => ({
+    id: item.id,
+    owner_id: ownerId,
+
         requirement_source_id: item.requirementSourceId,
         item_type: item.itemType,
         title: item.title,
