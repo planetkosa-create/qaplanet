@@ -91,8 +91,9 @@ export type GeneratedScript = {
   code: string;
   createdAt: string;
   language?: AutomationLanguage;
-  framework?: "Playwright" | "Gherkin Feature";
-  generationType?: "script" | "pageObject" | "fullPackage" | "apiTests" | "feature";
+  framework?: "Playwright" | "Playwright Python" | "Gherkin Feature";
+  generationType?: "script" | "pageObject" | "fullPackage" | "apiTests" | "feature" | "pythonBdd";
+  linkedFeatureFileName?: string;
 };
 
 export type UploadedDocument = {
