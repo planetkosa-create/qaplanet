@@ -8,6 +8,7 @@ import {
   Code2,
   Download,
   FileCheck2,
+  FolderKanban,
   Gauge,
   GitBranch,
   HelpCircle,
@@ -21,12 +22,14 @@ import { clsx } from "clsx";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/requirements-upload", label: "Requirements Upload", icon: UploadCloud },
   { href: "/ai-analysis", label: "AI Analysis", icon: Bot },
   { href: "/test-case-generator", label: "Test Case Generator", icon: FileCheck2 },
   { href: "/automation-readiness", label: "Automation Readiness", icon: Gauge },
   { href: "/code-generation", label: "Code Generation", icon: Code2 },
   { href: "/traceability", label: "Traceability", icon: GitBranch },
+  { href: "/coverage", label: "Coverage", icon: Gauge },
   { href: "/export-center", label: "Export Center", icon: Download },
   { href: "/settings", label: "Settings", icon: Settings }
 ];

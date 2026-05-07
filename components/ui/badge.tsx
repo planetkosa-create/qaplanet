@@ -17,8 +17,10 @@ const priorityStyles: Record<Priority, string> = {
 
 const statusStyles: Record<TestCaseStatus, string> = {
   Draft: "bg-slate-100 text-slate-700 ring-slate-200",
+  "In Review": "bg-blue-50 text-blue-700 ring-blue-200",
   Approved: "bg-teal-50 text-teal-700 ring-teal-200",
-  Rejected: "bg-rose-50 text-rose-700 ring-rose-200"
+  Rejected: "bg-rose-50 text-rose-700 ring-rose-200",
+  "Needs Update": "bg-amber-50 text-amber-700 ring-amber-200"
 };
 
 export function Badge({
