@@ -10,7 +10,8 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          navy: "#10223f",
+          navy: "#111827",
+          deep: "#0f3d91",
           blue: "#2563eb",
           sky: "#dcecff",
           teal: "#0f766e",
@@ -18,7 +19,7 @@ const config: Config = {
         }
       },
       boxShadow: {
-        soft: "0 12px 40px rgba(16, 34, 63, 0.08)"
+        soft: "0 10px 30px rgba(15, 23, 42, 0.07)"
       }
     }
   },
