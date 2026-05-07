@@ -152,7 +152,7 @@ export default function AutomationReadinessPage() {
       {message ? <p className="mb-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
 
       <div className="mb-4 flex items-center gap-3">
-        <Badge tone="blue">{selectedIds.length} approved automatable cases selected</Badge>
+        <Badge tone="blue">{selectedIds.length} automatable cases selected</Badge>
       </div>
 
       <div className="card overflow-hidden">
