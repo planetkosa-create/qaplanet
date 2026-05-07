@@ -26,8 +26,8 @@ const navItems = [
   { href: "/test-case-generator", label: "Test Case Generator", icon: FileCheck2 },
   { href: "/automation-readiness", label: "Automation Readiness", icon: Gauge },
   { href: "/code-generation", label: "Code Generation", icon: Code2 },
-  { href: "/export-center", label: "Export Center", icon: Download },
   { href: "/traceability", label: "Traceability", icon: GitBranch },
+  { href: "/export-center", label: "Export Center", icon: Download },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
