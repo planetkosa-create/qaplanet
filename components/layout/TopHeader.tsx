@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, ChevronDown, HelpCircle, Loader2, LogOut, Menu, Search, Settings, UserCircle } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { clearQaPlanetLocalData } from "@/lib/storage";
 
 type UserDisplay = {
   name: string;
@@ -73,7 +74,7 @@ export function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
       if (supabase) {
         await supabase.auth.signOut();
       }
-      clearLocalQaPlanetState();
+      clearQaPlanetLocalData();
       setDropdownOpen(false);
       router.replace("/login");
       router.refresh();
@@ -180,16 +181,6 @@ export function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
     </header>
   );
-}
-
-function clearLocalQaPlanetState() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  Object.keys(window.localStorage)
-    .filter((key) => key.startsWith("qaplanet."))
-    .forEach((key) => window.localStorage.removeItem(key));
 }
 
 function IconButton({ label, children }: { label: string; children: ReactNode }) {

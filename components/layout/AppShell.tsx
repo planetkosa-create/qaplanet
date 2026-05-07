@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
 import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase";
+import { clearQaPlanetLocalData } from "@/lib/storage";
 
 export function AppShell({ children, rightRail }: { children: ReactNode; rightRail?: ReactNode }) {
   const router = useRouter();
@@ -24,7 +25,7 @@ export function AppShell({ children, rightRail }: { children: ReactNode; rightRa
 
       const result = await supabase.auth.getUser();
       if (!result.data.user) {
-        clearLocalQaPlanetState();
+        clearQaPlanetLocalData();
         router.replace("/login");
       }
     }
@@ -50,14 +51,4 @@ export function AppShell({ children, rightRail }: { children: ReactNode; rightRa
       </div>
     </div>
   );
-}
-
-function clearLocalQaPlanetState() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  Object.keys(window.localStorage)
-    .filter((key) => key.startsWith("qaplanet."))
-    .forEach((key) => window.localStorage.removeItem(key));
 }
