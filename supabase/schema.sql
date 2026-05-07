@@ -305,6 +305,8 @@ end $$;
 alter table public.generated_automation
 add constraint generated_automation_language_check
 check (language in ('typescript', 'python', 'gherkin'));
+alter table public.generated_automation add column if not exists generation_type text;
+alter table public.generated_automation add column if not exists linked_feature_file_name text;
 
 alter table public.exports alter column project_id drop not null;
 do $$
