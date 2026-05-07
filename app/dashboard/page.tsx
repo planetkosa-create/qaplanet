@@ -13,7 +13,8 @@ import { ResetProjectWorkflow } from "@/components/reset-project-workflow";
 import { GuidanceRail } from "@/components/layout/GuidanceRail";
 import { StatCard } from "@/components/ui/StatCard";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
-import type { AnalysisItem, Project, RequirementAnalysis, TestCase, UploadedDocument } from "@/lib/types";
+import { buildCoverageSummary } from "@/lib/coverage";
+import type { AnalysisItem, Project, RequirementAnalysis, RequirementSource, TestCase, UploadedDocument } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { isUuid, sanitizeProject } from "@/lib/project-context";
 
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [analysisItems, setAnalysisItems] = useState<AnalysisItem[]>([]);
   const [testCases, setTestCases] = useState<TestCase[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [requirementSources, setRequirementSources] = useState<RequirementSource[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +56,7 @@ export default function DashboardPage() {
     setAnalysisItems(readJson(appStorageKeys.analysisItems, []));
     setTestCases(readJson(appStorageKeys.testCases, []));
     setDocuments(readJson(appStorageKeys.documents, []));
+    setRequirementSources(readJson(appStorageKeys.requirementSources, []));
 
     async function loadSupabaseProject() {
       const supabase = createSupabaseBrowserClient();
@@ -99,6 +102,10 @@ export default function DashboardPage() {
     const approved = testCases.filter((testCase) => testCase.status === "Approved").length;
     return { automatable, approved };
   }, [testCases]);
+  const coverage = useMemo(
+    () => buildCoverageSummary({ sources: requirementSources, analysisItems, testCases }),
+    [analysisItems, requirementSources, testCases]
+  );
 
   function resetDashboardState() {
     setAnalysis({
@@ -223,6 +230,13 @@ export default function DashboardPage() {
         })}
       </section>
 
+      <section className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <StatCard label="Requirements Covered" value={coverage.requirementsCovered} hint={`${coverage.totalRequirements} total requirements`} />
+        <StatCard label="Requirements Without Test Cases" value={coverage.requirementsWithoutTestCases} />
+        <StatCard label="Risks" value={coverage.risks} />
+        <StatCard label="Gaps" value={coverage.gaps} />
+      </section>
+
       <section className="mt-6 grid gap-5 2xl:grid-cols-[0.85fr_1.15fr]">
         <form onSubmit={saveProject} className="card p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -287,6 +301,49 @@ export default function DashboardPage() {
               <Button variant="secondary" icon={<ArrowRight className="size-4" aria-hidden />}>Generate Code</Button>
             </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="mt-6 card overflow-hidden">
+        <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-700">Coverage Snapshot</h2>
+            <p className="mt-1 text-xs text-slate-500">Requirement coverage based on current analysis items and test cases.</p>
+          </div>
+          <Link href="/coverage">
+            <Button variant="secondary" className="min-h-9 px-3 py-1.5">Open Coverage</Button>
+          </Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead className="table-head">
+              <tr>
+                <th className="px-4 py-3">Requirement</th>
+                <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Test Cases</th>
+                <th className="px-4 py-3">Approved</th>
+                <th className="px-4 py-3">Automation</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {coverage.rows.slice(0, 5).map((row) => (
+                <tr key={row.requirementReference} className="table-row">
+                  <td className="whitespace-nowrap px-4 py-3 font-bold text-brand-blue">{row.requirementReference}</td>
+                  <td className="px-4 py-3 text-slate-700">{row.requirementTitle}</td>
+                  <td className="px-4 py-3">{row.testCaseCount}</td>
+                  <td className="px-4 py-3">{row.approvedCount}</td>
+                  <td className="px-4 py-3">{row.automationCount}</td>
+                  <td className="px-4 py-3"><Badge tone={row.coverageStatus === "Covered" ? "teal" : row.coverageStatus === "Partial" ? "blue" : "neutral"}>{row.coverageStatus}</Badge></td>
+                </tr>
+              ))}
+              {!coverage.rows.length ? (
+                <tr>
+                  <td className="px-4 py-6 text-center text-slate-500" colSpan={6}>Upload requirements and generate test cases to see coverage.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
     </AppShell>

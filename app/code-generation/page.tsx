@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clipboard, Download, Loader2, Play, Save, ServerCog } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import { Clipboard, Download, FileArchive, FileCode2, Loader2, Play, Save, ServerCog } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ export default function CodeGenerationPage() {
   const [scripts, setScripts] = useState<GeneratedScript[]>(sampleGeneratedAutomations);
   const [activeScript, setActiveScript] = useState<GeneratedScript>({ ...sampleScript, language: "typescript", framework: "Playwright" });
   const [loading, setLoading] = useState(false);
+  const [packageLoading, setPackageLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -76,6 +79,54 @@ export default function CodeGenerationPage() {
     }
   }
 
+  function generatePageObject() {
+    const code = buildPageObject(selectedTestCases);
+    const nextScript: GeneratedScript = {
+      id: crypto.randomUUID(),
+      testCaseIds: selectedTestCases.map((testCase) => testCase.id),
+      name: "pages/qaplanet-application.page.ts",
+      code,
+      createdAt: new Date().toISOString(),
+      language: "typescript",
+      framework: "Playwright"
+    };
+    const nextScripts = [nextScript, ...scripts.filter((script) => script.id !== nextScript.id)];
+    setActiveScript(nextScript);
+    setScripts(nextScripts);
+    writeJson(appStorageKeys.generatedScript, nextScript);
+    writeJson(appStorageKeys.generatedAutomations, nextScripts);
+    setMessage("Generated Playwright Page Object Model file.");
+  }
+
+  async function downloadFullPackage() {
+    setPackageLoading(true);
+    setMessage("");
+    try {
+      const zip = new JSZip();
+      const root = zip.folder("qaplanet-playwright-package");
+      if (!root) {
+        throw new Error("Could not create Playwright package.");
+      }
+
+      const scriptCode = activeScript.code || buildSpecFile(selectedTestCases);
+      root.file("package.json", buildPackageJson());
+      root.file("playwright.config.ts", buildPlaywrightConfig());
+      root.file("README.md", buildPackageReadme(selectedTestCases));
+      root.file("tests/qaplanet-generated.spec.ts", scriptCode);
+      root.file("pages/qaplanet-application.page.ts", buildPageObject(selectedTestCases));
+      root.file("data/qaplanet-test-data.ts", buildTestData(selectedTestCases));
+      root.file("utils/env.ts", buildEnvHelper());
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveAs(blob, "qaplanet-playwright-package.zip");
+      setMessage("Full Playwright package downloaded.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Playwright package generation failed.");
+    } finally {
+      setPackageLoading(false);
+    }
+  }
+
   async function copyCode() {
     await navigator.clipboard.writeText(activeScript.code);
     setMessage("Code copied to clipboard.");
@@ -121,7 +172,13 @@ export default function CodeGenerationPage() {
               <option value="python">Playwright Python</option>
             </select>
             <Button onClick={generateScript} disabled={loading || selectedTestCases.length === 0} icon={loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Play className="size-4" aria-hidden />}>
-              Generate Playwright
+              Generate Script
+            </Button>
+            <Button variant="secondary" disabled={selectedTestCases.length === 0} onClick={generatePageObject} icon={<FileCode2 className="size-4" aria-hidden />}>
+              Generate Page Object
+            </Button>
+            <Button variant="secondary" disabled={packageLoading} onClick={downloadFullPackage} icon={packageLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileArchive className="size-4" aria-hidden />}>
+              {packageLoading ? "Preparing ZIP" : "Generate Full Package"}
             </Button>
             <Button variant="secondary" disabled icon={<ServerCog className="size-4" aria-hidden />}>Generate API Tests</Button>
             <Button variant="secondary" onClick={copyCode} icon={<Clipboard className="size-4" aria-hidden />}>Copy</Button>
@@ -179,6 +236,7 @@ export default function CodeGenerationPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={saveScript} icon={<Save className="size-4" aria-hidden />}>Save Script</Button>
+              <Button variant="secondary" onClick={downloadFullPackage} disabled={packageLoading} icon={packageLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileArchive className="size-4" aria-hidden />}>Download ZIP</Button>
               <Button
                 variant="secondary"
                 onClick={() => downloadTextFile(fileName, activeScript.code, activeScript.language === "python" ? "text/x-python" : "text/typescript")}
@@ -197,4 +255,148 @@ export default function CodeGenerationPage() {
       {message ? <p className="mt-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
     </AppShell>
   );
+}
+
+function buildSpecFile(testCases: TestCase[]) {
+  const cases = testCases.length ? testCases : [];
+  return `import { test, expect } from "@playwright/test";
+import { QaplanetApplicationPage } from "../pages/qaplanet-application.page";
+import { testUsers } from "../data/qaplanet-test-data";
+
+test.describe("QAplanet generated regression package", () => {
+${cases
+  .map(
+    (testCase) => `  test("${testCase.testCaseId}: ${escapeForCode(testCase.title ?? testCase.name)}", async ({ page }) => {
+    const app = new QaplanetApplicationPage(page);
+    await app.goto();
+    await app.signIn(testUsers.standard.email, testUsers.standard.password);
+    // TODO: Update selectors and setup data for ${testCase.requirementReference}.
+    await expect(page.getByRole("heading")).toBeVisible();
+  });`
+  )
+  .join("\n\n")}
+});\n`;
+}
+
+function buildPageObject(testCases: TestCase[]) {
+  const references = Array.from(new Set(testCases.map((testCase) => testCase.requirementReference).filter(Boolean)));
+  return `import type { Page } from "@playwright/test";
+
+export class QaplanetApplicationPage {
+  constructor(private readonly page: Page) {}
+
+  async goto() {
+    await this.page.goto(process.env.QAPLANET_BASE_URL ?? "http://localhost:3000");
+  }
+
+  async signIn(email = process.env.QAPLANET_TEST_USER ?? "", password = process.env.QAPLANET_TEST_PASSWORD ?? "") {
+    await this.page.getByLabel(/email/i).fill(email);
+    await this.page.getByLabel(/password/i).fill(password);
+    await this.page.getByRole("button", { name: /sign in|login/i }).click();
+  }
+
+  async openRequirementArea(reference: string) {
+    // TODO: Replace with the target application's stable navigation pattern.
+    await this.page.getByText(reference, { exact: false }).click();
+  }
+}
+
+export const coveredRequirementReferences = ${JSON.stringify(references, null, 2)};
+`;
+}
+
+function buildTestData(testCases: TestCase[]) {
+  return `export const testUsers = {
+  standard: {
+    email: process.env.QAPLANET_TEST_USER ?? "",
+    password: process.env.QAPLANET_TEST_PASSWORD ?? ""
+  }
+};
+
+export const generatedTestCases = ${JSON.stringify(
+    testCases.map((testCase) => ({
+      id: testCase.testCaseId,
+      title: testCase.title ?? testCase.name,
+      requirementReference: testCase.requirementReference,
+      priority: testCase.priority,
+      type: testCase.testType ?? testCase.type
+    })),
+    null,
+    2
+  )};
+`;
+}
+
+function buildEnvHelper() {
+  return `export function requiredEnv(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(\`Missing required environment variable: \${name}\`);
+  }
+  return value;
+}
+`;
+}
+
+function buildPackageJson() {
+  return JSON.stringify(
+    {
+      name: "qaplanet-playwright-package",
+      version: "1.0.0",
+      private: true,
+      scripts: {
+        test: "playwright test",
+        "test:headed": "playwright test --headed"
+      },
+      devDependencies: {
+        "@playwright/test": "^1.44.0",
+        typescript: "^5.0.0"
+      }
+    },
+    null,
+    2
+  );
+}
+
+function buildPlaywrightConfig() {
+  return `import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./tests",
+  timeout: 30_000,
+  use: {
+    baseURL: process.env.QAPLANET_BASE_URL,
+    trace: "on-first-retry"
+  },
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } }
+  ]
+});
+`;
+}
+
+function buildPackageReadme(testCases: TestCase[]) {
+  return `# QAplanet Playwright Package
+
+Generated by QAplanet.
+
+## Environment variables
+
+- QAPLANET_BASE_URL
+- QAPLANET_TEST_USER
+- QAPLANET_TEST_PASSWORD
+
+## Included assets
+
+- tests/qaplanet-generated.spec.ts
+- pages/qaplanet-application.page.ts
+- data/qaplanet-test-data.ts
+- utils/env.ts
+
+Selected test cases: ${testCases.length}
+`;
+}
+
+function escapeForCode(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

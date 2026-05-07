@@ -78,7 +78,7 @@ const testCaseBatches = [
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
 const types: TestCaseType[] = ["Functional", "Negative", "Edge", "Security", "Integration", "Accessibility", "Performance", "Regression"];
 const readinessValues: AutomationReadiness[] = ["Automatable", "Needs API/Data", "Manual Only"];
-const statuses: TestCaseStatus[] = ["Draft", "Approved", "Rejected"];
+const statuses: TestCaseStatus[] = ["Draft", "In Review", "Approved", "Rejected", "Needs Update"];
 
 export async function POST(request: Request) {
   try {

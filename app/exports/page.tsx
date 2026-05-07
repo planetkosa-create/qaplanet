@@ -9,12 +9,12 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { appStorageKeys, readJson } from "@/lib/storage";
+import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { getStoredProjectId } from "@/lib/project-context";
 import { sampleTestCases } from "@/lib/sample-data";
 import { buildSampleTraceability, sampleAnalysisItems, sampleAutomationAssessments, sampleGeneratedAutomations, sampleRequirementSources } from "@/lib/phase2-sample-data";
-import type { AnalysisItem, AutomationAssessment, GeneratedScript, Project, RequirementSource, TestCase, TraceabilityRow } from "@/lib/types";
+import type { AnalysisItem, AutomationAssessment, ExportHistoryItem, GeneratedScript, Project, RequirementSource, TestCase, TraceabilityRow } from "@/lib/types";
 import {
   analysisItemsToCsv,
   downloadTextFile,
@@ -46,6 +46,7 @@ export default function ExportsPage() {
   const [readiness, setReadiness] = useState<AutomationAssessment[]>(sampleAutomationAssessments);
   const [traceability, setTraceability] = useState<TraceabilityRow[]>(buildSampleTraceability());
   const [scripts, setScripts] = useState<GeneratedScript[]>(sampleGeneratedAutomations);
+  const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([]);
   const [packageLoading, setPackageLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -57,6 +58,7 @@ export default function ExportsPage() {
     setReadiness(readJson(appStorageKeys.automationAssessments, sampleAutomationAssessments));
     setTraceability(readJson(appStorageKeys.traceabilityRows, buildSampleTraceability()));
     setScripts(readJson(appStorageKeys.generatedAutomations, sampleGeneratedAutomations));
+    setExportHistory(readJson(appStorageKeys.exportHistory, []));
   }, []);
 
   const counts = useMemo(
@@ -113,6 +115,7 @@ export default function ExportsPage() {
       const blob = await zip.generateAsync({ type: "blob" });
       const zipFileName = `${rootName}.zip`;
       saveAs(blob, zipFileName);
+      recordExport({ fileName: zipFileName, exportType: "Complete Project Package", rowCount: data.testCases.length + data.analysisItems.length + data.traceability.length });
       setMessage(`Complete project package downloaded: ${zipFileName}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Project package export failed.");
@@ -151,7 +154,23 @@ export default function ExportsPage() {
     }
 
     await saveExportMetadata(scope, format, `${fileBase}.${extensionForFormat(format)}`, rows.length);
+    recordExport({ fileName: `${fileBase}.${extensionForFormat(format)}`, exportType: `${scope} ${format}`, rowCount: rows.length });
     setMessage(`${scope} exported as ${format}.`);
+  }
+
+  function recordExport(item: { fileName: string; exportType: string; rowCount?: number }) {
+    const nextHistory: ExportHistoryItem[] = [
+      {
+        id: crypto.randomUUID(),
+        fileName: item.fileName,
+        exportType: item.exportType,
+        rowCount: item.rowCount,
+        createdAt: new Date().toISOString()
+      },
+      ...exportHistory
+    ].slice(0, 20);
+    setExportHistory(nextHistory);
+    writeJson(appStorageKeys.exportHistory, nextHistory);
   }
 
   return (
@@ -220,6 +239,40 @@ export default function ExportsPage() {
             </div>
           </article>
         ))}
+      </section>
+
+      <section className="card mt-5 overflow-hidden">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <h2 className="text-sm font-bold text-slate-700">Export History</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="table-head">
+              <tr>
+                <th className="px-4 py-3">File name</th>
+                <th className="px-4 py-3">Export type</th>
+                <th className="px-4 py-3">Created date</th>
+                <th className="px-4 py-3">Download action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {exportHistory.length ? (
+                exportHistory.map((item) => (
+                  <tr key={item.id} className="table-row">
+                    <td className="px-4 py-3 font-semibold text-slate-800">{item.fileName}</td>
+                    <td className="px-4 py-3">{item.exportType}</td>
+                    <td className="px-4 py-3 text-slate-600">{new Date(item.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-500">Regenerate from export cards</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-4 py-8 text-center text-slate-500" colSpan={4}>No exports have been generated in this browser session yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {message ? <p className="mt-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}

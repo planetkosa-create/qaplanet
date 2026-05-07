@@ -227,7 +227,7 @@ export default function TestCasesPage() {
           <Filter label="Priority" value={priority} options={[all, "Critical", "High", "Medium", "Low"]} onChange={(value) => setPriority(value as Priority | typeof all)} />
           <Filter label="Type" value={type} options={[all, "Functional", "Negative", "Edge", "Security", "Integration", "Accessibility", "Performance", "Regression"]} onChange={(value) => setType(value as TestCaseType | typeof all)} />
           <Filter label="Automation candidate" value={candidate} options={["All", "Yes", "No"]} onChange={(value) => setCandidate(value as "All" | "Yes" | "No")} />
-          <Filter label="Approval status" value={approval} options={[all, "Draft", "Approved", "Rejected"]} onChange={(value) => setApproval(value as TestCaseStatus | typeof all)} />
+          <Filter label="Approval status" value={approval} options={[all, "Draft", "In Review", "Approved", "Rejected", "Needs Update"]} onChange={(value) => setApproval(value as TestCaseStatus | typeof all)} />
         </div>
       </section>
 
@@ -305,8 +305,10 @@ export default function TestCasesPage() {
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
                         <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setSelectedCase(testCase)} icon={<Eye className="size-4" aria-hidden />}>View</Button>
-                        <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => updateCase(testCase.id, { status: "Approved", approvalStatus: "Approved" })}>Approve</Button>
-                        <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => updateCase(testCase.id, { status: "Rejected", approvalStatus: "Rejected" })}>Reject</Button>
+                        <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => updateCase(testCase.id, { status: "In Review", approvalStatus: "In Review", updatedAt: new Date().toISOString() })}>Submit for Review</Button>
+                        <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => updateCase(testCase.id, { status: "Approved", approvalStatus: "Approved", approvedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })}>Approve</Button>
+                        <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => updateCase(testCase.id, { status: "Rejected", approvalStatus: "Rejected", rejectedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })}>Reject</Button>
+                        <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => updateCase(testCase.id, { status: "Needs Update", approvalStatus: "Needs Update", updatedAt: new Date().toISOString() })}>Needs Update</Button>
                       </div>
                     </td>
                   </tr>
@@ -357,6 +359,20 @@ export default function TestCasesPage() {
               </div>
               <p className="text-sm text-slate-600"><strong>Expected result:</strong> {selectedCase.expectedResult}</p>
               <p className="text-sm text-slate-600"><strong>Automation notes:</strong> {selectedCase.automationNotes}</p>
+              <label>
+                <span className="mb-1 block text-sm font-semibold text-slate-700">Review note</span>
+                <Textarea
+                  rows={3}
+                  value={selectedCase.reviewNotes ?? ""}
+                  onChange={(event) => setSelectedCase({ ...selectedCase, reviewNotes: event.target.value, updatedAt: new Date().toISOString() })}
+                  placeholder="Add reviewer feedback, data setup notes, or approval context."
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => setSelectedCase({ ...selectedCase, status: "In Review", approvalStatus: "In Review", updatedAt: new Date().toISOString() })}>Submit for Review</Button>
+                <Button variant="secondary" onClick={() => setSelectedCase({ ...selectedCase, status: "Approved", approvalStatus: "Approved", approvedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })}>Approve</Button>
+                <Button variant="secondary" onClick={() => setSelectedCase({ ...selectedCase, status: "Rejected", approvalStatus: "Rejected", rejectedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })}>Reject</Button>
+              </div>
               <Button onClick={() => { updateCase(selectedCase.id, selectedCase); setSelectedCase(null); }}>Save Changes</Button>
             </div>
           </div>
@@ -421,6 +437,12 @@ function normalizeGeneratedTestCases(payload: unknown): TestCase[] {
       automationNotes: stringValue(record.automation_notes) || stringValue(record.automationNotes),
       status,
       approvalStatus: status,
+      reviewNotes: stringValue(record.review_notes) || stringValue(record.reviewNotes),
+      approvedBy: stringValue(record.approved_by) || stringValue(record.approvedBy),
+      approvedAt: stringValue(record.approved_at) || stringValue(record.approvedAt),
+      rejectedBy: stringValue(record.rejected_by) || stringValue(record.rejectedBy),
+      rejectedAt: stringValue(record.rejected_at) || stringValue(record.rejectedAt),
+      updatedAt: stringValue(record.updated_at) || stringValue(record.updatedAt),
       analysisItemIds: Array.isArray(record.analysis_item_ids) ? record.analysis_item_ids.map(String) : Array.isArray(record.analysisItemIds) ? record.analysisItemIds.map(String) : [],
       requirementSourceIds: Array.isArray(record.requirement_source_ids)
         ? record.requirement_source_ids.map(String)
@@ -487,7 +509,7 @@ function normalizeReadiness(value: unknown): AutomationReadiness {
 
 function normalizeStatus(value: unknown): TestCaseStatus {
   const candidate = String(value);
-  return ["Draft", "Approved", "Rejected"].includes(candidate) ? (candidate as TestCaseStatus) : "Draft";
+  return ["Draft", "In Review", "Approved", "Rejected", "Needs Update"].includes(candidate) ? (candidate as TestCaseStatus) : "Draft";
 }
 
 function stringValue(value: unknown) {
