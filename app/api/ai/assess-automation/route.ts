@@ -7,12 +7,25 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type AssessmentResponse = {
-  assessments: Array<{
-    testCaseId: string;
-    readiness: AutomationReadiness;
-    automationCandidate: boolean;
-    notes: string;
-  }>;
+  assessments?: RawAssessment[];
+  automation_assessments?: RawAssessment[];
+};
+
+type RawAssessment = {
+  testCaseId?: string;
+  test_case_id?: string;
+  readiness?: string;
+  automationCandidate?: boolean;
+  automation_candidate?: boolean;
+  notes?: string;
+  reason?: string;
+};
+
+type NormalizedAssessment = {
+  testCaseId: string;
+  readiness: AutomationReadiness;
+  automationCandidate: boolean;
+  notes: string;
 };
 
 export async function POST(request: Request) {
@@ -40,7 +53,8 @@ export async function POST(request: Request) {
 
     const content = completion.choices[0]?.message.content ?? "{}";
     const parsed = safeJsonParse<AssessmentResponse>(content, { assessments: [] });
-    const assessmentById = new Map(parsed.assessments.map((assessment) => [assessment.testCaseId, assessment]));
+    const assessments = normalizeAssessments(parsed);
+    const assessmentById = new Map(assessments.map((assessment) => [assessment.testCaseId, assessment]));
 
     const nextTestCases = testCases.map((testCase) => {
       const assessment = assessmentById.get(testCase.testCaseId);
@@ -65,4 +79,43 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Automation assessment failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function normalizeAssessments(payload: unknown): NormalizedAssessment[] {
+  const raw = payload as { assessments?: unknown; automation_assessments?: unknown } | unknown[];
+  const assessments = Array.isArray((raw as { assessments?: unknown }).assessments)
+    ? (raw as { assessments: unknown[] }).assessments
+    : Array.isArray((raw as { automation_assessments?: unknown }).automation_assessments)
+      ? (raw as { automation_assessments: unknown[] }).automation_assessments
+      : Array.isArray(raw)
+        ? raw
+        : [];
+
+  return assessments.map((item: unknown) => {
+    const assessment = item as RawAssessment;
+    const readiness = normalizeReadiness(assessment.readiness);
+    return {
+      testCaseId: assessment.testCaseId || assessment.test_case_id || "",
+      readiness,
+      automationCandidate:
+        typeof assessment.automationCandidate === "boolean"
+          ? assessment.automationCandidate
+          : typeof assessment.automation_candidate === "boolean"
+            ? assessment.automation_candidate
+            : readiness === "Automatable",
+      notes: assessment.notes || assessment.reason || readinessNote(readiness)
+    };
+  }).filter((assessment) => assessment.testCaseId);
+}
+
+function normalizeReadiness(value: unknown): AutomationReadiness {
+  return ["Automatable", "Needs API/Data", "Manual Only"].includes(String(value))
+    ? (value as AutomationReadiness)
+    : "Manual Only";
+}
+
+function readinessNote(readiness: AutomationReadiness) {
+  if (readiness === "Automatable") return "Good candidate for Playwright automation with stable selectors and test data.";
+  if (readiness === "Needs API/Data") return "Automation is possible after test data, API access, or environment setup is available.";
+  return "Manual review is recommended due to human judgment, external dependency, or unstable validation.";
 }

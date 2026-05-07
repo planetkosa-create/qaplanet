@@ -88,14 +88,24 @@ export default function AutomationReadinessPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ testCases })
       });
-      const data = (await response.json().catch(() => ({}))) as { testCases?: TestCase[]; error?: string };
+      const data = (await response.json().catch(() => ({}))) as { testCases?: unknown; test_cases?: unknown; error?: string };
+      const generatedTestCases = Array.isArray(data.testCases)
+        ? (data.testCases as TestCase[])
+        : Array.isArray(data.test_cases)
+          ? (data.test_cases as TestCase[])
+          : [];
 
-      if (!response.ok || !data.testCases) {
+      if (!response.ok) {
         setMessage(data.error ?? "Automation assessment failed. Check OpenAI quota and runtime logs.");
         return;
       }
 
-      const nextAssessments: AutomationAssessment[] = data.testCases.map((testCase) => ({
+      if (generatedTestCases.length === 0) {
+        setMessage("Automation assessment completed but no test cases were returned.");
+        return;
+      }
+
+      const nextAssessments: AutomationAssessment[] = generatedTestCases.map((testCase) => ({
         id: `assess-${testCase.id}`,
         testCaseId: testCase.id,
         readiness: testCase.automationStatus ?? testCase.readiness,
@@ -103,9 +113,9 @@ export default function AutomationReadinessPage() {
         reason: testCase.readinessReason ?? testCase.automationNotes,
         recommendedFramework: testCase.recommendedFramework ?? ((testCase.automationStatus ?? testCase.readiness) === "Manual Only" ? "Manual" : "Playwright")
       }));
-      persistCases(data.testCases);
+      persistCases(generatedTestCases);
       persistAssessments(nextAssessments);
-      persistSelection(data.testCases.filter((testCase) => (testCase.automationStatus ?? testCase.readiness) === "Automatable").map((testCase) => testCase.id));
+      persistSelection(generatedTestCases.filter((testCase) => (testCase.automationStatus ?? testCase.readiness) === "Automatable").map((testCase) => testCase.id));
       await saveAssessmentsToSupabase(nextAssessments);
       setMessage("Automation readiness scoring completed.");
     } catch (error) {
