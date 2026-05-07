@@ -276,23 +276,23 @@ export default function TestCasesPage() {
       ) : filtered.length ? (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <table className="w-full min-w-[1240px] table-fixed text-left text-sm">
+              <thead className="table-head">
                 <tr>
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Requirement</th>
-                  <th className="px-4 py-3">Priority</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Automation</th>
-                  <th className="px-4 py-3">Approval</th>
-                  <th className="px-4 py-3">Actions</th>
+                  <th className="w-32 px-4 py-3">ID</th>
+                  <th className="w-[30rem] px-4 py-3">Title</th>
+                  <th className="w-40 px-4 py-3">Requirement</th>
+                  <th className="w-32 px-4 py-3">Priority</th>
+                  <th className="w-36 px-4 py-3">Type</th>
+                  <th className="w-44 px-4 py-3">Automation</th>
+                  <th className="w-36 px-4 py-3">Approval</th>
+                  <th className="w-72 px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {visibleCases.map((testCase) => (
-                  <tr key={testCase.id} className="align-top">
-                    <td className="px-4 py-4 font-semibold text-brand-blue">{testCase.testCaseId}</td>
+                  <tr key={testCase.id} className="table-row">
+                    <td className="whitespace-nowrap px-4 py-4 font-bold text-brand-blue">{testCase.testCaseId}</td>
                     <td className="px-4 py-4">
                       <p className="font-semibold text-slate-950">{testCase.title ?? testCase.name}</p>
                       <p className="mt-1 line-clamp-2 text-slate-600">{testCase.description}</p>

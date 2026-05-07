@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, FileText, Loader2, Send, UploadCloud } from "lucide-react";
+import { Bot, FileSpreadsheet, FileText, FileType2, Loader2, Send, UploadCloud } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { GuidanceRail } from "@/components/layout/GuidanceRail";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase";
 import { getStoredProjectId } from "@/lib/project-context";
@@ -163,7 +164,7 @@ export default function UploadPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell rightRail={<GuidanceRail />}>
       <PageHeader
         title="Requirements Upload"
         description="Upload BRDs, user stories, acceptance criteria, spreadsheets, PDFs, or paste requirements manually. Extracted text is stored as requirement sources for traceable AI analysis."
@@ -174,9 +175,9 @@ export default function UploadPage() {
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid gap-5 2xl:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-5">
-          <label className="card flex min-h-64 cursor-pointer flex-col items-center justify-center border-dashed p-8 text-center hover:border-brand-blue hover:bg-blue-50/40">
+          <label className="card flex min-h-64 cursor-pointer flex-col items-center justify-center border-dashed p-8 text-center transition hover:border-brand-blue hover:bg-blue-50/40">
             <UploadCloud className="size-12 text-brand-blue" aria-hidden />
             <span className="mt-4 text-lg font-semibold text-slate-950">Upload requirement files</span>
             <span className="mt-2 text-sm text-slate-600">Supports DOCX, PDF, XLSX, and TXT.</span>
@@ -188,6 +189,24 @@ export default function UploadPage() {
               </span>
             ) : null}
           </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Word DOCX", icon: FileText, hint: "BRDs and formatted requirements" },
+              { label: "PDF", icon: FileType2, hint: "Signed planning documents" },
+              { label: "Excel XLSX", icon: FileSpreadsheet, hint: "Matrices and tabular criteria" },
+              { label: "User Stories TXT", icon: FileText, hint: "Plain text backlog exports" }
+            ].map((format) => {
+              const Icon = format.icon;
+              return (
+                <div key={format.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <Icon className="size-5 text-brand-blue" aria-hidden />
+                  <h3 className="mt-3 text-sm font-bold text-slate-950">{format.label}</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{format.hint}</p>
+                </div>
+              );
+            })}
+          </div>
 
           <div className="card p-5">
             <div className="flex items-center justify-between gap-3">
@@ -219,7 +238,7 @@ export default function UploadPage() {
 
           <div className="mt-4 space-y-3">
             {sources.map((source) => (
-              <article key={source.id} className="rounded-lg border border-slate-200 p-4">
+              <article key={source.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-950">{source.fileName}</p>

@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge, ReadinessBadge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/StatCard";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { getStoredProjectId } from "@/lib/project-context";
@@ -153,12 +154,11 @@ export default function AutomationReadinessPage() {
         }
       />
 
-      <section className="mb-5 grid gap-4 md:grid-cols-5">
-        <Metric label="Total test cases" value={stats.total} />
-        <Metric label="Automatable" value={stats.automatable} />
-        <Metric label="Needs API/Data" value={stats.needsData} />
-        <Metric label="Manual Only" value={stats.manual} />
-        <Metric label="Automation potential" value={`${stats.potential}%`} />
+      <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Automation Potential" value={`${stats.potential}%`} hint={`${stats.total} total test cases`} />
+        <StatCard label="Automatable" value={stats.automatable} />
+        <StatCard label="Needs API/Data" value={stats.needsData} />
+        <StatCard label="Manual Only" value={stats.manual} />
       </section>
 
       {message ? <p className="mb-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
@@ -169,11 +169,12 @@ export default function AutomationReadinessPage() {
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <table className="w-full min-w-[1180px] text-left text-sm">
+            <thead className="table-head">
               <tr>
                 <th className="px-4 py-3">Select</th>
-                <th className="px-4 py-3">Test Case</th>
+                <th className="px-4 py-3">Test Case ID</th>
+                <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Readiness</th>
                 <th className="px-4 py-3">Confidence</th>
                 <th className="px-4 py-3">Reason</th>
@@ -185,7 +186,7 @@ export default function AutomationReadinessPage() {
                 const assessment = assessments.find((item) => item.testCaseId === testCase.id);
                 const readiness = assessment?.readiness ?? testCase.automationStatus ?? testCase.readiness;
                 return (
-                  <tr key={testCase.id} className="align-top">
+                  <tr key={testCase.id} className="table-row">
                     <td className="px-4 py-4">
                       <input
                         type="checkbox"
@@ -196,10 +197,8 @@ export default function AutomationReadinessPage() {
                         aria-label={`Select ${testCase.testCaseId}`}
                       />
                     </td>
-                    <td className="px-4 py-4">
-                      <p className="font-semibold text-brand-blue">{testCase.testCaseId}</p>
-                      <p className="mt-1 font-semibold text-slate-950">{testCase.title ?? testCase.name}</p>
-                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 font-bold text-brand-blue">{testCase.testCaseId}</td>
+                    <td className="px-4 py-4 font-semibold text-slate-950">{testCase.title ?? testCase.name}</td>
                     <td className="px-4 py-4"><ReadinessBadge value={readiness} /></td>
                     <td className="px-4 py-4">{Math.round((assessment?.confidenceScore ?? testCase.readinessConfidence ?? 0.75) * 100)}%</td>
                     <td className="px-4 py-4 text-slate-600">{assessment?.reason ?? testCase.readinessReason ?? testCase.automationNotes}</td>
@@ -212,14 +211,5 @@ export default function AutomationReadinessPage() {
         </div>
       </div>
     </AppShell>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="card p-5">
-      <p className="text-sm font-semibold text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
-    </div>
   );
 }

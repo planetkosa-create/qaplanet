@@ -7,12 +7,15 @@ import { ArrowRight, Bot, CheckCircle2, FileText, FolderPlus, Gauge, Loader2, Up
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Badge, ReadinessBadge } from "@/components/ui/badge";
+import { Badge, ReadinessBadge, StatusBadge } from "@/components/ui/badge";
 import { Input, Textarea } from "@/components/ui/field";
 import { ResetProjectWorkflow } from "@/components/reset-project-workflow";
+import { GuidanceRail } from "@/components/layout/GuidanceRail";
+import { StatCard } from "@/components/ui/StatCard";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { sampleAnalysis, sampleDocuments, sampleRequirements, sampleTestCases } from "@/lib/sample-data";
-import type { Project, RequirementAnalysis, TestCase, UploadedDocument } from "@/lib/types";
+import { sampleAnalysisItems } from "@/lib/phase2-sample-data";
+import type { AnalysisItem, Project, RequirementAnalysis, TestCase, UploadedDocument } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { isUuid, sanitizeProject } from "@/lib/project-context";
 
@@ -26,6 +29,7 @@ export default function DashboardPage() {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
   const [analysis, setAnalysis] = useState<RequirementAnalysis>(sampleAnalysis);
+  const [analysisItems, setAnalysisItems] = useState<AnalysisItem[]>(sampleAnalysisItems);
   const [testCases, setTestCases] = useState<TestCase[]>(sampleTestCases);
   const [documents, setDocuments] = useState<UploadedDocument[]>(sampleDocuments);
   const [message, setMessage] = useState("");
@@ -36,6 +40,7 @@ export default function DashboardPage() {
     setProject(storedProject);
     writeJson(appStorageKeys.project, storedProject);
     setAnalysis(readJson(appStorageKeys.analysis, sampleAnalysis));
+    setAnalysisItems(readJson(appStorageKeys.analysisItems, sampleAnalysisItems));
     setTestCases(readJson(appStorageKeys.testCases, sampleTestCases));
     setDocuments(readJson(appStorageKeys.documents, sampleDocuments));
     if (!window.localStorage.getItem(appStorageKeys.requirements)) {
@@ -100,6 +105,7 @@ export default function DashboardPage() {
       systems: [],
       dataRequirements: []
     });
+    setAnalysisItems([]);
     setTestCases([]);
     setDocuments([]);
     setMessage("Project workflow has been reset successfully.");
@@ -186,7 +192,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell rightRail={<GuidanceRail />}>
       <PageHeader
         title="Dashboard"
         description="Create projects, track uploaded requirement sources, review analysis coverage, and move high-value test cases toward automation."
@@ -197,31 +203,31 @@ export default function DashboardPage() {
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {[
           { label: "Documents", value: documents.length, icon: FileText },
-          { label: "Analysis items", value: analysis.businessRules.length + analysis.acceptanceCriteria.length, icon: Bot },
+          { label: "Analysis items", value: analysisItems.length || analysis.businessRules.length + analysis.acceptanceCriteria.length, icon: Bot },
           { label: "Generated test cases", value: testCases.length, icon: CheckCircle2 },
           { label: "Automatable", value: stats.automatable, icon: Gauge }
         ].map((item) => {
           const Icon = item.icon;
-          return (
-            <div key={item.label} className="card p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-500">{item.label}</p>
-                <Icon className="size-5 text-brand-blue" aria-hidden />
-              </div>
-              <p className="mt-4 text-3xl font-bold text-slate-950">{item.value}</p>
-            </div>
-          );
+          return <StatCard key={item.label} label={item.label} value={item.value} icon={<Icon className="size-5" aria-hidden />} />;
         })}
       </section>
 
-      <section className="mt-6 grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+      <section className="mt-6 grid gap-5 2xl:grid-cols-[0.85fr_1.15fr]">
         <form onSubmit={saveProject} className="card p-5">
-          <div className="flex items-center gap-2">
-            <FolderPlus className="size-5 text-brand-teal" aria-hidden />
-            <h2 className="text-lg font-semibold text-slate-950">Project</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="grid size-10 place-items-center rounded-lg bg-teal-50 text-brand-teal">
+                <FolderPlus className="size-5" aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Project</h2>
+                <p className="text-sm text-slate-500">Keep the active QA workspace aligned to your current initiative.</p>
+              </div>
+            </div>
+            {project.id ? <Badge tone="blue">Project ID saved</Badge> : <Badge>Local draft</Badge>}
           </div>
           <div className="mt-5 space-y-4">
             <label className="block">
@@ -245,20 +251,23 @@ export default function DashboardPage() {
         <div className="card p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-950">Current QA Flow</h2>
+              <h2 className="text-lg font-bold text-slate-950">Current QA Flow</h2>
               <p className="mt-1 text-sm text-slate-600">{project.name}</p>
             </div>
             <Badge tone="teal">{stats.approved} approved</Badge>
           </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
             {testCases.slice(0, 3).map((testCase) => (
-              <article key={testCase.id} className="rounded-lg border border-slate-200 p-4">
+              <article key={testCase.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-brand-blue">{testCase.testCaseId}</span>
+                  <span className="whitespace-nowrap text-xs font-bold text-brand-blue">{testCase.testCaseId}</span>
                   <ReadinessBadge value={testCase.readiness} />
                 </div>
                 <h3 className="mt-3 text-sm font-semibold text-slate-950">{testCase.name}</h3>
                 <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{testCase.description}</p>
+                <div className="mt-3">
+                  <StatusBadge value={testCase.approvalStatus ?? testCase.status} />
+                </div>
               </article>
             ))}
           </div>

@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { GuidanceRail } from "@/components/layout/GuidanceRail";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { getStoredProjectId, isUuid } from "@/lib/project-context";
@@ -105,7 +106,7 @@ export default function AnalysisPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell rightRail={<GuidanceRail />}>
       <PageHeader
         title="AI Analysis"
         description="Extract traceable business rules, user stories, acceptance criteria, risks, gaps, actors, systems, and data requirements."
@@ -121,7 +122,7 @@ export default function AnalysisPage() {
         }
       />
 
-      <section className="mb-5 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+      <section className="mb-5 grid gap-4 2xl:grid-cols-[0.85fr_1.15fr]">
         <div className="card p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-950">Analysis Summary</h2>
@@ -140,7 +141,7 @@ export default function AnalysisPage() {
           </div>
           <div className="max-h-96 overflow-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <thead className="table-head">
                 <tr>
                   <th className="px-4 py-3">Reference</th>
                   <th className="px-4 py-3">Type</th>
@@ -150,7 +151,7 @@ export default function AnalysisPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {items.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className="table-row">
                     <td className="px-4 py-3 font-semibold text-brand-blue">{item.referenceCode}</td>
                     <td className="px-4 py-3">{item.itemType}</td>
                     <td className="px-4 py-3 text-slate-700">{item.title}</td>
@@ -164,7 +165,7 @@ export default function AnalysisPage() {
       </section>
 
       {items.length ? (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {grouped.map((group) => (
             <article key={group.type} className="card p-5">
               <div className="flex items-center justify-between gap-3">

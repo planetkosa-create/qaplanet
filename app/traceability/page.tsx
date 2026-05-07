@@ -68,8 +68,8 @@ export default function TraceabilityPage() {
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1300px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <table className="w-full min-w-[1320px] text-left text-sm">
+            <thead className="table-head">
               <tr>
                 <th className="px-4 py-3">Requirement Reference</th>
                 <th className="px-4 py-3">Source Document</th>
@@ -83,11 +83,11 @@ export default function TraceabilityPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((row) => (
-                <tr key={`${row.requirementReference}-${row.testCaseId}`}>
+                <tr key={`${row.requirementReference}-${row.testCaseId}`} className="table-row">
                   <td className="px-4 py-4 font-semibold text-brand-blue">{row.requirementReference}</td>
                   <td className="px-4 py-4 text-slate-700">{row.sourceDocument}</td>
                   <td className="px-4 py-4"><Badge>{row.analysisItem}</Badge></td>
-                  <td className="px-4 py-4 font-semibold text-slate-950">{row.testCaseId}</td>
+                  <td className="whitespace-nowrap px-4 py-4 font-bold text-slate-950">{row.testCaseId}</td>
                   <td className="px-4 py-4 text-slate-700">{row.testCaseTitle}</td>
                   <td className="px-4 py-4"><ReadinessBadge value={row.automationStatus} /></td>
                   <td className="px-4 py-4 text-slate-700">{row.generatedScript}</td>

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileJson, FileSpreadsheet, FileText, Table2 } from "lucide-react";
+import { Archive, Download, FileJson, FileSpreadsheet, FileText, Table2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,23 @@ export default function ExportsPage() {
         title="Export Center"
         description="Export QA deliverables for review, audit, test management import, automation handoff, and traceability reporting."
       />
+
+      <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {[
+          "Test Cases CSV",
+          "Test Cases Excel",
+          "Analysis Markdown",
+          "Readiness Report",
+          "Traceability Matrix",
+          "Generated Automation ZIP"
+        ].map((label) => (
+          <article key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <Archive className="size-5 text-brand-blue" aria-hidden />
+            <h2 className="mt-3 text-sm font-bold text-slate-950">{label}</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Prepared for stakeholder review and downstream QA handoff.</p>
+          </article>
+        ))}
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
         {(["Test cases", "Analysis items", "Automation readiness", "Traceability matrix"] as ExportScope[]).map((scope) => (

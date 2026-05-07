@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clipboard, Download, Loader2, Play, Save } from "lucide-react";
+import { Clipboard, Download, Loader2, Play, Save, ServerCog } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -121,8 +121,9 @@ export default function CodeGenerationPage() {
               <option value="python">Playwright Python</option>
             </select>
             <Button onClick={generateScript} disabled={loading || selectedTestCases.length === 0} icon={loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Play className="size-4" aria-hidden />}>
-              Generate Code
+              Generate Playwright
             </Button>
+            <Button variant="secondary" disabled icon={<ServerCog className="size-4" aria-hidden />}>Generate API Tests</Button>
             <Button variant="secondary" onClick={copyCode} icon={<Clipboard className="size-4" aria-hidden />}>Copy</Button>
           </>
         }
@@ -132,14 +133,14 @@ export default function CodeGenerationPage() {
         <div className="space-y-5">
           <div className="card p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-950">Selected Automatable Cases</h2>
+              <h2 className="text-lg font-bold text-slate-950">Selectable Approved Automatable Cases</h2>
               <Badge tone="blue">{selectedTestCases.length} ready</Badge>
             </div>
             <div className="mt-4 space-y-3">
               {selectedTestCases.length ? (
                 selectedTestCases.map((testCase) => (
-                  <div key={testCase.id} className="rounded-md border border-slate-200 p-3">
-                    <p className="text-sm font-semibold text-slate-950">{testCase.testCaseId}: {testCase.title ?? testCase.name}</p>
+                  <div key={testCase.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-950"><span className="whitespace-nowrap text-brand-blue">{testCase.testCaseId}</span>: {testCase.title ?? testCase.name}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-600">{testCase.automationNotes}</p>
                   </div>
                 ))
@@ -187,7 +188,7 @@ export default function CodeGenerationPage() {
               </Button>
             </div>
           </div>
-          <pre className="max-h-[700px] overflow-auto bg-slate-950 p-5 text-xs leading-6 text-slate-100">
+          <pre className="max-h-[700px] overflow-auto bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-100">
             <code>{activeScript.language === "python" && !activeScript.code ? samplePythonScript.code : activeScript.code}</code>
           </pre>
         </div>
