@@ -24,7 +24,7 @@ export type AnalysisItemType =
   | "System / Integration"
   | "Data Requirement";
 export type RecommendedFramework = "Playwright" | "API" | "Manual";
-export type AutomationLanguage = "typescript" | "python";
+export type AutomationLanguage = "typescript" | "python" | "gherkin";
 export type CoverageStatus = "Covered" | "Partial" | "Not Covered";
 
 export type Project = {
@@ -91,7 +91,8 @@ export type GeneratedScript = {
   code: string;
   createdAt: string;
   language?: AutomationLanguage;
-  framework?: "Playwright";
+  framework?: "Playwright" | "Gherkin Feature";
+  generationType?: "script" | "pageObject" | "fullPackage" | "apiTests" | "feature";
 };
 
 export type UploadedDocument = {
