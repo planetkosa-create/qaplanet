@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { Clipboard, Download, FileArchive, FileCode2, Loader2, Play, Save, ServerCog } from "lucide-react";
+import { Clipboard, Download, FileArchive, FileCode2, FileText, Loader2, Play, Save, ServerCog } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export default function CodeGenerationPage() {
   const [scripts, setScripts] = useState<GeneratedScript[]>(sampleGeneratedAutomations);
   const [activeScript, setActiveScript] = useState<GeneratedScript>({ ...sampleScript, language: "typescript", framework: "Playwright" });
   const [loading, setLoading] = useState(false);
+  const [featureLoading, setFeatureLoading] = useState(false);
   const [packageLoading, setPackageLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -98,6 +99,73 @@ export default function CodeGenerationPage() {
     setMessage("Generated Playwright Page Object Model file.");
   }
 
+  async function generateFeature() {
+    setFeatureLoading(true);
+    setMessage("");
+    try {
+      const approvedAutomatableCases = selectedTestCases.filter(
+        (testCase) =>
+          (testCase.approvalStatus ?? testCase.status) === "Approved" &&
+          (testCase.automationStatus ?? testCase.readiness) === "Automatable"
+      );
+
+      if (!approvedAutomatableCases.length) {
+        throw new Error("Select at least one approved automatable test case before generating a feature file.");
+      }
+
+      let generatedFeature = generateGherkinFeatureFromTestCases(approvedAutomatableCases);
+      let fileName = slugifyFeatureName(inferFeatureTitle(approvedAutomatableCases));
+
+      try {
+        const response = await fetch("/api/ai/generate-scripts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: getStoredProjectId(),
+            generationType: "feature",
+            framework: "Gherkin",
+            testCaseIds: approvedAutomatableCases.map((testCase) => testCase.id),
+            testCases: approvedAutomatableCases
+          })
+        });
+        const result = (await response.json().catch(() => ({}))) as {
+          success?: boolean;
+          fileName?: string;
+          language?: AutomationLanguage;
+          content?: string;
+        };
+
+        if (response.ok && result.success && result.content) {
+          generatedFeature = result.content;
+          fileName = result.fileName || fileName;
+        }
+      } catch {
+        // Local fallback keeps feature generation available when AI is unavailable.
+      }
+
+      const nextScript: GeneratedScript = {
+        id: crypto.randomUUID(),
+        testCaseIds: approvedAutomatableCases.map((testCase) => testCase.id),
+        name: fileName,
+        code: generatedFeature,
+        createdAt: new Date().toISOString(),
+        language: "gherkin",
+        framework: "Gherkin Feature",
+        generationType: "feature"
+      };
+      const nextScripts = [nextScript, ...scripts.filter((script) => script.id !== nextScript.id)];
+      setActiveScript(nextScript);
+      setScripts(nextScripts);
+      writeJson(appStorageKeys.generatedScript, nextScript);
+      writeJson(appStorageKeys.generatedAutomations, nextScripts);
+      setMessage("Generated Gherkin feature file from approved automatable test cases.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Feature file generation failed.");
+    } finally {
+      setFeatureLoading(false);
+    }
+  }
+
   async function downloadFullPackage() {
     setPackageLoading(true);
     setMessage("");
@@ -109,10 +177,14 @@ export default function CodeGenerationPage() {
       }
 
       const scriptCode = activeScript.code || buildSpecFile(selectedTestCases);
+      const featureCode = generateGherkinFeatureFromTestCases(
+        selectedTestCases.filter((testCase) => (testCase.approvalStatus ?? testCase.status) === "Approved")
+      );
       root.file("package.json", buildPackageJson());
       root.file("playwright.config.ts", buildPlaywrightConfig());
       root.file("README.md", buildPackageReadme(selectedTestCases));
       root.file("tests/qaplanet-generated.spec.ts", scriptCode);
+      root.file("features/qaplanet-generated.feature", featureCode);
       root.file("pages/qaplanet-application.page.ts", buildPageObject(selectedTestCases));
       root.file("data/qaplanet-test-data.ts", buildTestData(selectedTestCases));
       root.file("utils/env.ts", buildEnvHelper());
@@ -151,7 +223,7 @@ export default function CodeGenerationPage() {
       owner_id: ownerId,
       name: activeScript.name,
       language: activeScript.language ?? language,
-      framework: activeScript.framework ?? "Playwright",
+      framework: activeScript.framework ?? (activeScript.language === "gherkin" ? "Gherkin Feature" : "Playwright"),
       test_case_ids: activeScript.testCaseIds,
       code: activeScript.code
     });
@@ -176,6 +248,9 @@ export default function CodeGenerationPage() {
             </Button>
             <Button variant="secondary" disabled={selectedTestCases.length === 0} onClick={generatePageObject} icon={<FileCode2 className="size-4" aria-hidden />}>
               Generate Page Object
+            </Button>
+            <Button variant="secondary" disabled={featureLoading} onClick={generateFeature} icon={featureLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileText className="size-4" aria-hidden />}>
+              {featureLoading ? "Generating Feature" : "Generate Feature"}
             </Button>
             <Button variant="secondary" disabled={packageLoading} onClick={downloadFullPackage} icon={packageLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileArchive className="size-4" aria-hidden />}>
               {packageLoading ? "Preparing ZIP" : "Generate Full Package"}
@@ -232,14 +307,14 @@ export default function CodeGenerationPage() {
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-950">{fileName}</h2>
-              <p className="text-sm text-slate-500">Playwright {activeScript.language === "python" ? "Python" : "TypeScript"}</p>
+              <p className="text-sm text-slate-500">{activeScript.language === "gherkin" ? "Gherkin Feature" : `Playwright ${activeScript.language === "python" ? "Python" : "TypeScript"}`}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={saveScript} icon={<Save className="size-4" aria-hidden />}>Save Script</Button>
               <Button variant="secondary" onClick={downloadFullPackage} disabled={packageLoading} icon={packageLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileArchive className="size-4" aria-hidden />}>Download ZIP</Button>
               <Button
                 variant="secondary"
-                onClick={() => downloadTextFile(fileName, activeScript.code, activeScript.language === "python" ? "text/x-python" : "text/typescript")}
+                onClick={() => downloadTextFile(fileName, activeScript.code, mimeTypeForScript(activeScript.language))}
                 icon={<Download className="size-4" aria-hidden />}
               >
                 Download
@@ -395,6 +470,149 @@ Generated by QAplanet.
 
 Selected test cases: ${testCases.length}
 `;
+}
+
+function generateGherkinFeatureFromTestCases(testCases: TestCase[]) {
+  const cases = testCases.length ? testCases : [];
+  const featureTitle = inferFeatureTitle(cases);
+  const commonPrecondition = inferCommonPrecondition(cases);
+
+  return [
+    "# Purpose: This file contains test scenarios written in the Gherkin language.",
+    "# Each scenario represents expected application behavior derived from approved QAplanet test cases.",
+    "# This file is intended to act as the single source of truth for business-readable automated test coverage.",
+    "",
+    "@qaplanet",
+    tagFromText(featureTitle),
+    `Feature: ${featureTitle}`,
+    "",
+    "  Background:",
+    `    Given ${commonPrecondition}`,
+    "",
+    ...cases.flatMap((testCase) => [
+      `  # QAplanet Test Case: ${testCase.testCaseId}`,
+      `  # Requirement Reference: ${testCase.requirementReference || "UNMAPPED"}`,
+      `  ${scenarioTags(testCase).join(" ")}`,
+      `  Scenario: ${businessReadable(testCase.title ?? testCase.name)}`,
+      ...mapTestCaseToGherkinSteps(testCase),
+      ""
+    ])
+  ].join("\n");
+}
+
+function mapTestCaseToGherkinSteps(testCase: TestCase) {
+  const steps = Array.isArray(testCase.steps) ? testCase.steps.filter(Boolean) : [];
+  const output: string[] = [];
+  const precondition = cleanGherkinText(testCase.preconditions || "the required preconditions are met");
+
+  output.push(`    Given ${precondition}`);
+
+  if (!steps.length) {
+    output.push(`    When the user completes the ${cleanGherkinText(testCase.title ?? testCase.name)} workflow`);
+  } else {
+    steps.forEach((step, index) => {
+      const keyword = index === 0 ? "When" : "And";
+      output.push(`    ${keyword} ${cleanGherkinText(step)}`);
+    });
+  }
+
+  output.push(`    Then ${cleanGherkinText(testCase.expectedResult || "the expected outcome is displayed")}`);
+  return output;
+}
+
+function scenarioTags(testCase: TestCase) {
+  const tags = new Set<string>(["@regression"]);
+  const type = testCase.testType ?? testCase.type;
+  const readiness = testCase.automationStatus ?? testCase.readiness;
+
+  if (testCase.priority === "Critical" && !["Negative", "Security", "Performance"].includes(type)) {
+    tags.add("@smoke");
+  }
+  if (type === "Negative") tags.add("@negative");
+  if (type === "Security") tags.add("@security");
+  if (type === "Accessibility") tags.add("@accessibility");
+  if (type === "Performance") tags.add("@performance");
+  if (type === "Integration") tags.add("@integration");
+  if (readiness === "Manual Only") tags.add("@manual");
+  if (readiness === "Automatable") tags.add("@automated");
+  if (testCase.requirementReference) {
+    tags.add(tagFromText(testCase.requirementReference));
+  }
+
+  return [...tags];
+}
+
+function inferFeatureTitle(testCases: TestCase[]) {
+  const first = testCases[0];
+  if (!first) {
+    return "QAplanet Generated Behavior";
+  }
+
+  const title = first.title ?? first.name;
+  const separators = [" - ", ": ", " | "];
+  for (const separator of separators) {
+    if (title.includes(separator)) {
+      const [area] = title.split(separator);
+      if (area?.trim()) {
+        return businessReadable(area.trim());
+      }
+    }
+  }
+
+  const words = title.split(/\s+/).slice(0, 5).join(" ");
+  return businessReadable(words || "QAplanet Generated Behavior");
+}
+
+function inferCommonPrecondition(testCases: TestCase[]) {
+  const preconditions = testCases.map((testCase) => cleanGherkinText(testCase.preconditions)).filter(Boolean);
+  const [first] = preconditions;
+  if (first && preconditions.every((item) => item === first)) {
+    return first;
+  }
+  return "the user has access to the application";
+}
+
+function slugifyFeatureName(title: string) {
+  const slug = title
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+
+  return `${slug || "generated_feature"}.feature`;
+}
+
+function tagFromText(value: string) {
+  const tag = value
+    .trim()
+    .replace(/^@/, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  return `@${tag || "qaplanet"}`;
+}
+
+function businessReadable(value: string) {
+  return value.replace(/\s+/g, " ").trim().replace(/[.]+$/g, "");
+}
+
+function cleanGherkinText(value: string) {
+  return businessReadable(value)
+    .replace(/\b(click|tap)\b/gi, "select")
+    .replace(/\bCSS selector\b/gi, "field")
+    .replace(/\blocator\b/gi, "element")
+    .replace(/["`]/g, "'");
+}
+
+function mimeTypeForScript(language: AutomationLanguage | undefined) {
+  if (language === "python") {
+    return "text/x-python";
+  }
+  if (language === "gherkin") {
+    return "text/x-gherkin";
+  }
+  return "text/typescript";
 }
 
 function escapeForCode(value: string) {

@@ -408,7 +408,7 @@ function addGeneratedAutomationFiles(folder: JSZip, scripts: GeneratedScript[], 
   scripts.forEach((script, index) => {
     const linkedTestCase = testCases.find((testCase) => script.testCaseIds.includes(testCase.id) || script.testCaseIds.includes(testCase.testCaseId));
     const testCaseId = linkedTestCase?.testCaseId ?? `script-${index + 1}`;
-    const extension = script.language === "python" ? "py" : "ts";
+    const extension = script.language === "python" ? "py" : script.language === "gherkin" ? "feature" : "ts";
     const baseName = safeFileName(script.name || `${testCaseId}-playwright.${extension}`);
     const fileName = baseName.toLowerCase().endsWith(`.${extension}`)
       ? `${safeFileName(testCaseId)}_${baseName}`
@@ -521,16 +521,16 @@ function rowToAutomationAssessment(row: Record<string, unknown>, testCases: Test
 }
 
 function rowToGeneratedScript(row: Record<string, unknown>): GeneratedScript {
-  const language = row.language === "python" ? "python" : "typescript";
+  const language = row.language === "python" ? "python" : row.language === "gherkin" ? "gherkin" : "typescript";
 
   return {
     id: stringValue(row.id) || crypto.randomUUID(),
     testCaseIds: Array.isArray(row.test_case_ids) ? row.test_case_ids.map(String) : [],
-    name: stringValue(row.name) || (language === "python" ? "generated.spec.py" : "generated.spec.ts"),
+    name: stringValue(row.name) || (language === "python" ? "generated.spec.py" : language === "gherkin" ? "generated_feature.feature" : "generated.spec.ts"),
     code: stringValue(row.code),
     createdAt: stringValue(row.created_at) || new Date().toISOString(),
     language,
-    framework: "Playwright"
+    framework: language === "gherkin" ? "Gherkin Feature" : "Playwright"
   };
 }
 
