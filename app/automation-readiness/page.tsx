@@ -59,13 +59,15 @@ export default function AutomationReadinessPage() {
     }
     const user = await supabase.auth.getUser();
     if (!user.data.user) {
-      return;
-    }
+  return;
+}
+const ownerId = user.data.user.id;
 
-    await supabase.from("automation_assessments").insert(
-      next.map((assessment) => ({
-        id: assessment.id,
-        owner_id: user.data.user.id,
+await supabase.from("automation_assessments").insert(
+  next.map((assessment) => ({
+    id: assessment.id,
+    owner_id: ownerId,
+
         test_case_ref: assessment.testCaseId,
         readiness: assessment.readiness,
         confidence_score: assessment.confidenceScore,
