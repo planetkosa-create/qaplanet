@@ -1,12 +1,36 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
+import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase";
 
 export function AppShell({ children, rightRail }: { children: ReactNode; rightRail?: ReactNode }) {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    async function protectWorkspace() {
+      if (!hasSupabaseConfig()) {
+        return;
+      }
+
+      const supabase = createSupabaseBrowserClient();
+      if (!supabase) {
+        return;
+      }
+
+      const result = await supabase.auth.getUser();
+      if (!result.data.user) {
+        clearLocalQaPlanetState();
+        router.replace("/login");
+      }
+    }
+
+    void protectWorkspace();
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -26,4 +50,14 @@ export function AppShell({ children, rightRail }: { children: ReactNode; rightRa
       </div>
     </div>
   );
+}
+
+function clearLocalQaPlanetState() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  Object.keys(window.localStorage)
+    .filter((key) => key.startsWith("qaplanet."))
+    .forEach((key) => window.localStorage.removeItem(key));
 }
