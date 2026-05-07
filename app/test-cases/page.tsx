@@ -58,11 +58,12 @@ export default function TestCasesPage() {
     if (!user.data.user) {
       return;
     }
+    const ownerId = user.data.user.id;
 
     await supabase.from("test_cases").insert(
       nextCases.map((testCase) => ({
         id: testCase.id,
-        owner_id: user.data.user.id,
+        owner_id: ownerId,
         test_case_id: testCase.testCaseId,
         requirement_reference: testCase.requirementReference,
         name: testCase.name,
