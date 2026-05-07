@@ -87,7 +87,7 @@ ${getJsonInstruction(`{
     "steps": ["string"],
     "expectedResult": "string",
     "priority": "Critical|High|Medium|Low",
-    "type": "Functional|Negative|Edge|Validation|Role-based|Integration|Regression",
+    "type": "Functional|Negative|Edge|Security|Integration|Accessibility|Performance|Regression",
     "requirementReference": "string",
     "automationCandidate": true,
     "automationNotes": "string",
@@ -102,40 +102,91 @@ Analysis:
 ${JSON.stringify(analysis, null, 2)}`;
 }
 
-export function buildPhase2TestCasePrompt(sources: RequirementSource[], analysisItems: AnalysisItem[]) {
+export function buildPhase2TestCasePrompt(
+  sources: RequirementSource[],
+  analysisItems: AnalysisItem[],
+  options?: { batchName?: string; coverageFocus?: string[]; startNumber?: number; minimumCount?: number }
+) {
+  const coverageFocus = options?.coverageFocus?.length
+    ? options.coverageFocus
+    : [
+        "Registration validation",
+        "Login and account lockout",
+        "Role-based access control",
+        "Draft creation and duplicate draft prevention",
+        "Required field validation",
+        "Application save and resume",
+        "Document upload validation",
+        "Required document enforcement",
+        "Application submission",
+        "Read-only submitted applications",
+        "Application status visibility",
+        "Withdrawal rules",
+        "Reviewer queue filtering and sorting",
+        "Reviewer status updates",
+        "Administrator configuration",
+        "Audit history",
+        "Notification triggers",
+        "Accessibility checks",
+        "Performance checks",
+        "Security checks"
+      ];
+
   return `${qaSystemPrompt}
 
-Generate structured enterprise QA test cases from the requirement sources and analysis items.
+You are a senior QA Lead generating enterprise-level test coverage. Based on the full BRD, analysis items, business rules, acceptance criteria, risks, gaps, assumptions, and suggested test coverage areas, generate a comprehensive set of test cases. Do not summarize. Do not generate fewer than 25 test cases when sufficient requirements exist. Cover positive, negative, edge, role-based, validation, security, integration, accessibility, performance, and audit scenarios where applicable.
 
-Generate positive, negative, edge, role-based, validation, security, integration, and regression cases where relevant.
+Batch focus: ${options?.batchName ?? "Full BRD coverage"}
+
+Coverage areas to target in this response:
+${coverageFocus.map((area) => `- ${area}`).join("\n")}
+
+Generation rules:
+- Use requirement_sources.extracted_text, analysis_items, business rules, acceptance criteria, risks, gaps, and assumptions.
+- Explicitly inspect and use any "Suggested Test Coverage Areas" section in the BRD.
+- Do not generate only one test case per analysis item.
+- Do not stop after six test cases.
+- For each major functional requirement, generate at least one happy path, one negative test, and one validation or edge case where applicable.
+- Include security, role-based, integration/API/data, accessibility, performance, audit, and notification scenarios when present.
+- Generate at least ${options?.minimumCount ?? 7} test cases for this batch when the BRD contains enough relevant detail.
+- Start numbering at QA-TC-${String(options?.startNumber ?? 1).padStart(3, "0")}.
+- Default approval_status/status to Draft.
+- Use only these priority values: Critical, High, Medium, Low.
+- Use only these test_type/type values: Functional, Negative, Edge, Security, Integration, Accessibility, Performance, Regression.
+- Use only these automation_status/readiness values: Automatable, Needs API/Data, Manual Only.
 
 Each test case must include a clear trace back to analysis item reference codes and requirement source IDs.
 
 ${getJsonInstruction(`{
-  "testCases": [{
-    "testCaseId": "QA-TC-001",
+  "test_cases": [{
+    "test_case_id": "QA-TC-001",
+    "requirement_reference": "REQ-001 or coverage area name",
     "title": "string",
-    "name": "string",
     "description": "string",
     "preconditions": "string",
     "steps": ["string"],
-    "expectedResult": "string",
+    "expected_result": "string",
     "priority": "Critical|High|Medium|Low",
-    "type": "Functional|Negative|Edge|Validation|Security|Role-based|Integration|Regression",
-    "testType": "Functional|Negative|Edge|Validation|Security|Role-based|Integration|Regression",
-    "requirementReference": "AC-001",
-    "automationCandidate": true,
-    "automationStatus": "Automatable|Needs API/Data|Manual Only",
-    "automationNotes": "string",
-    "status": "Draft",
-    "approvalStatus": "Draft",
-    "analysisItemIds": ["string"],
-    "requirementSourceIds": ["string"]
+    "test_type": "Functional|Negative|Edge|Security|Integration|Accessibility|Performance|Regression",
+    "automation_candidate": true,
+    "automation_status": "Automatable|Needs API/Data|Manual Only",
+    "automation_notes": "string",
+    "approval_status": "Draft",
+    "analysis_item_ids": ["string"],
+    "requirement_source_ids": ["string"]
   }]
 }`)}
 
 Requirement sources:
-${JSON.stringify(sources, null, 2)}
+${JSON.stringify(
+  sources.map((source) => ({
+    id: source.id,
+    fileName: source.fileName,
+    extracted_text: source.extractedText
+  })),
+  null,
+  2
+)}
 
 Analysis items:
 ${JSON.stringify(analysisItems, null, 2)}`;

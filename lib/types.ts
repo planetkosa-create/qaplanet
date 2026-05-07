@@ -5,6 +5,8 @@ export type TestCaseType =
   | "Edge"
   | "Validation"
   | "Security"
+  | "Accessibility"
+  | "Performance"
   | "Role-based"
   | "Integration"
   | "Regression";
