@@ -91,10 +91,11 @@ export default function CodeGenerationPage() {
       setMessage("Sign in before saving generated automation to Supabase.");
       return;
     }
+    const ownerId = user.data.user.id;
 
     await supabase.from("generated_automation").insert({
       id: activeScript.id,
-      owner_id: user.data.user.id,
+      owner_id: ownerId,
       name: activeScript.name,
       language: activeScript.language ?? language,
       framework: activeScript.framework ?? "Playwright",
