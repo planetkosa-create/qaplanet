@@ -326,3 +326,79 @@ for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
 
 create policy "generated_automation_crud_own" on public.generated_automation
 for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+-- Phase 3 additions: project workspace metadata, review workflow fields,
+-- updated status checks, and export history metadata for demo readiness.
+
+alter table public.projects add column if not exists client_name text;
+alter table public.projects add column if not exists application_name text;
+alter table public.projects add column if not exists release_name text;
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'projects_status_check'
+      and conrelid = 'public.projects'::regclass
+  ) then
+    alter table public.projects drop constraint projects_status_check;
+  end if;
+end $$;
+
+alter table public.projects
+add constraint projects_status_check
+check (status in ('active', 'archived'));
+
+alter table public.test_cases add column if not exists review_notes text;
+alter table public.test_cases add column if not exists approved_by uuid references auth.users(id) on delete set null;
+alter table public.test_cases add column if not exists approved_at timestamptz;
+alter table public.test_cases add column if not exists rejected_by uuid references auth.users(id) on delete set null;
+alter table public.test_cases add column if not exists rejected_at timestamptz;
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'test_cases_status_check'
+      and conrelid = 'public.test_cases'::regclass
+  ) then
+    alter table public.test_cases drop constraint test_cases_status_check;
+  end if;
+end $$;
+
+alter table public.test_cases
+add constraint test_cases_status_check
+check (status in ('Draft', 'In Review', 'Approved', 'Rejected', 'Needs Update'));
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'test_cases_approval_status_check'
+      and conrelid = 'public.test_cases'::regclass
+  ) then
+    alter table public.test_cases drop constraint test_cases_approval_status_check;
+  end if;
+end $$;
+
+alter table public.test_cases
+add constraint test_cases_approval_status_check
+check (
+  approval_status is null
+  or approval_status in ('Draft', 'In Review', 'Approved', 'Rejected', 'Needs Update')
+);
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'exports_export_type_check'
+      and conrelid = 'public.exports'::regclass
+  ) then
+    alter table public.exports drop constraint exports_export_type_check;
+  end if;
+end $$;
+
+alter table public.exports
+add constraint exports_export_type_check
+check (export_type in ('markdown', 'csv', 'json', 'excel', 'zip'));
