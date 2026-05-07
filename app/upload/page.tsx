@@ -50,10 +50,11 @@ export default function UploadPage() {
     if (!user.data.user) {
       return;
     }
+    const ownerId = user.data.user.id;
 
     await supabase.from("requirement_sources").insert({
       id: source.id,
-      owner_id: user.data.user.id,
+      owner_id: ownerId,
       file_name: source.fileName,
       source_type: source.sourceType,
       file_type: source.fileType,
@@ -108,7 +109,8 @@ export default function UploadPage() {
         if (configured && supabase) {
           const user = await supabase.auth.getUser();
           if (user.data.user) {
-            const path = `${user.data.user.id}/${crypto.randomUUID()}-${file.name}`;
+            const ownerId = user.data.user.id;
+            const path = `${ownerId}/${crypto.randomUUID()}-${file.name}`;
             const upload = await supabase.storage.from("requirement-documents").upload(path, file);
             if (!upload.error) {
               storagePath = path;
