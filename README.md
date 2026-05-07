@@ -12,7 +12,9 @@ Domain: `qaplanet.ca`
 - Supabase Storage upload support for `.docx`, `.pdf`, `.xlsx`, and `.txt`
 - Supabase Postgres schema for the requested product tables
 - OpenAI API routes for requirement analysis, test case generation, automation readiness, and Playwright TypeScript generation
-- Export support for Markdown, CSV, and Excel
+- Playwright TypeScript and Playwright Python automation generation
+- Export support for CSV, Markdown, JSON, and Excel
+- Traceability matrix from requirement source to analysis item to test case to generated automation
 - Seed sample project, sample requirements, sample test cases, and sample generated script
 - Loading states and basic error handling
 - Responsive sidebar and mobile navigation
@@ -29,14 +31,19 @@ app/
       generate-test-cases/route.ts
     documents/
       extract/route.ts
+  ai-analysis/page.tsx
   analysis/page.tsx
   automation-readiness/page.tsx
   code-generation/page.tsx
+  export-center/page.tsx
   dashboard/page.tsx
   exports/page.tsx
   login/page.tsx
   page.tsx
+  requirements-upload/page.tsx
   settings/page.tsx
+  traceability/page.tsx
+  test-case-generator/page.tsx
   test-cases/page.tsx
   upload/page.tsx
 components/
@@ -105,10 +112,13 @@ Required tables are included:
 - `profiles`
 - `projects`
 - `uploaded_documents`
+- `requirement_sources`
 - `requirement_analysis`
+- `analysis_items`
 - `test_cases`
 - `automation_assessments`
 - `generated_scripts`
+- `generated_automation`
 - `exports`
 
 Storage bucket:
@@ -158,15 +168,32 @@ Generated scripts are prompted to use:
 - Reusable helper structure when helpful
 - Environment variable placeholders instead of secrets
 
+Phase 2 supports both:
+
+- Playwright TypeScript, using `@playwright/test`
+- Playwright Python, using `playwright.sync_api` and pytest-style tests
+
 Common test runner placeholders:
 
 ```bash
-PLAYWRIGHT_BASE_URL=
-TEST_CUSTOMER_EMAIL=
-TEST_CUSTOMER_PASSWORD=
-TEST_INVALID_EMAIL=
-TEST_INVALID_PASSWORD=
+QAPLANET_BASE_URL=
+QAPLANET_TEST_USER=
+QAPLANET_TEST_PASSWORD=
 ```
+
+## Phase 2 Workflow
+
+Use these production routes:
+
+- `/requirements-upload`: upload or paste requirement sources
+- `/ai-analysis`: extract traceable analysis items
+- `/test-case-generator`: generate, filter, edit, approve, reject, and regenerate test cases
+- `/automation-readiness`: score automation readiness and select candidates
+- `/code-generation`: generate Playwright TypeScript or Python
+- `/export-center`: export CSV, Markdown, JSON, and Excel
+- `/traceability`: view source-to-analysis-to-test-to-script mapping
+
+Legacy Phase 1 routes such as `/upload`, `/analysis`, `/test-cases`, and `/exports` still work.
 
 ## First-Run Demo Mode
 
@@ -183,3 +210,7 @@ npm run build
 ```
 
 In this Codex environment, `npm` was not available on PATH and the bundled `node.exe` was blocked, so local install/build verification could not be executed here.
+
+## Deployment Notes
+
+After changing environment variables or pushing Phase 2 code, redeploy in Vercel. If OpenAI calls return `429`, add billing or credits to the OpenAI API organization, create a fresh API key, update `OPENAI_API_KEY`, and redeploy.

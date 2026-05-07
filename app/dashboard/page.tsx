@@ -90,7 +90,7 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Create projects, track uploaded requirement sources, review analysis coverage, and move high-value test cases toward automation."
         actions={
-          <Link href="/upload">
+          <Link href="/requirements-upload">
             <Button icon={<UploadCloud className="size-4" aria-hidden />}>Upload Requirements</Button>
           </Link>
         }
@@ -157,7 +157,7 @@ export default function DashboardPage() {
             ))}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/analysis">
+            <Link href="/ai-analysis">
               <Button variant="secondary" icon={<ArrowRight className="size-4" aria-hidden />}>Review Analysis</Button>
             </Link>
             <Link href="/code-generation">

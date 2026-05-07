@@ -56,10 +56,10 @@ export default function LandingPage() {
               and produce clean Playwright TypeScript scripts from one focused QA workspace.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/upload">
+              <Link href="/requirements-upload">
                 <Button icon={<FileText className="size-4" aria-hidden />}>Upload Requirements</Button>
               </Link>
-              <Link href="/test-cases">
+              <Link href="/test-case-generator">
                 <Button variant="secondary" icon={<CheckCircle2 className="size-4" aria-hidden />}>
                   View Sample Test Cases
                 </Button>

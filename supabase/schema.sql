@@ -196,23 +196,119 @@ drop policy if exists "requirement_documents_delete_own" on storage.objects;
 create policy "requirement_documents_select_own" on storage.objects
 for select using (
   bucket_id = 'requirement-documents'
-  and auth.uid()::text = owner
+  and owner = auth.uid()
 );
 
 create policy "requirement_documents_insert_own" on storage.objects
 for insert with check (
   bucket_id = 'requirement-documents'
-  and auth.uid()::text = owner
+  and owner = auth.uid()
 );
 
 create policy "requirement_documents_update_own" on storage.objects
 for update using (
   bucket_id = 'requirement-documents'
-  and auth.uid()::text = owner
+  and owner = auth.uid()
 );
 
 create policy "requirement_documents_delete_own" on storage.objects
 for delete using (
   bucket_id = 'requirement-documents'
-  and auth.uid()::text = owner
+  and owner = auth.uid()
 );
+
+-- Phase 2 additions: traceable requirement sources, analysis items, richer test cases,
+-- generated automation, exports, and compatibility columns.
+
+create table if not exists public.requirement_sources (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  file_name text not null,
+  source_type text not null check (source_type in ('Upload', 'Manual Paste')),
+  file_type text not null,
+  file_size bigint not null default 0,
+  storage_path text,
+  extracted_text text not null default '',
+  processing_status text not null default 'Uploaded' check (processing_status in ('Uploaded', 'Extracted', 'Analysis Ready', 'Failed')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.analysis_items (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  requirement_source_id uuid references public.requirement_sources(id) on delete set null,
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  item_type text not null check (item_type in ('Business Rule', 'User Story', 'Acceptance Criteria', 'Risk', 'Gap', 'Assumption', 'Actor / Role', 'System / Integration', 'Data Requirement')),
+  title text not null,
+  description text not null,
+  reference_code text not null,
+  confidence_score numeric(4,3) not null default 0.75,
+  created_at timestamptz not null default now()
+);
+
+alter table public.test_cases alter column project_id drop not null;
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'test_cases_type_check'
+      and conrelid = 'public.test_cases'::regclass
+  ) then
+    alter table public.test_cases drop constraint test_cases_type_check;
+  end if;
+end $$;
+
+alter table public.test_cases
+add constraint test_cases_type_check
+check (type in ('Functional', 'Negative', 'Edge', 'Validation', 'Security', 'Role-based', 'Integration', 'Regression'));
+alter table public.test_cases add column if not exists title text;
+alter table public.test_cases add column if not exists test_type text;
+alter table public.test_cases add column if not exists automation_status text;
+alter table public.test_cases add column if not exists approval_status text;
+alter table public.test_cases add column if not exists readiness_confidence numeric(4,3);
+alter table public.test_cases add column if not exists readiness_reason text;
+alter table public.test_cases add column if not exists recommended_framework text;
+alter table public.test_cases add column if not exists analysis_item_ids text[] not null default '{}';
+alter table public.test_cases add column if not exists requirement_source_ids text[] not null default '{}';
+
+alter table public.automation_assessments alter column project_id drop not null;
+alter table public.automation_assessments alter column test_case_id drop not null;
+alter table public.automation_assessments add column if not exists test_case_ref text;
+alter table public.automation_assessments add column if not exists confidence_score numeric(4,3) not null default 0.75;
+alter table public.automation_assessments add column if not exists reason text;
+alter table public.automation_assessments add column if not exists recommended_framework text;
+
+create table if not exists public.generated_automation (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name text not null,
+  language text not null check (language in ('typescript', 'python')),
+  framework text not null default 'Playwright',
+  test_case_ids text[] not null default '{}',
+  code text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.exports alter column project_id drop not null;
+alter table public.exports add column if not exists export_scope text;
+alter table public.exports add column if not exists export_format text;
+alter table public.exports add column if not exists row_count integer not null default 0;
+
+alter table public.requirement_sources enable row level security;
+alter table public.analysis_items enable row level security;
+alter table public.generated_automation enable row level security;
+
+drop policy if exists "requirement_sources_crud_own" on public.requirement_sources;
+drop policy if exists "analysis_items_crud_own" on public.analysis_items;
+drop policy if exists "generated_automation_crud_own" on public.generated_automation;
+
+create policy "requirement_sources_crud_own" on public.requirement_sources
+for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+create policy "analysis_items_crud_own" on public.analysis_items
+for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+create policy "generated_automation_crud_own" on public.generated_automation
+for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);

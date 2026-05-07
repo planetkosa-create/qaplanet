@@ -4,6 +4,11 @@ export const appStorageKeys = {
   analysis: "qaplanet.analysis",
   testCases: "qaplanet.testCases",
   documents: "qaplanet.documents",
+  requirementSources: "qaplanet.requirementSources",
+  analysisItems: "qaplanet.analysisItems",
+  automationAssessments: "qaplanet.automationAssessments",
+  generatedAutomations: "qaplanet.generatedAutomations",
+  traceabilityRows: "qaplanet.traceabilityRows",
   selectedTestCases: "qaplanet.selectedTestCases",
   generatedScript: "qaplanet.generatedScript"
 } as const;

@@ -11,6 +11,7 @@ import {
   FileCheck2,
   FileText,
   Gauge,
+  GitBranch,
   LayoutDashboard,
   Settings,
   ShieldCheck,
@@ -20,12 +21,13 @@ import { clsx } from "clsx";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/upload", label: "Requirements Upload", icon: UploadCloud },
-  { href: "/analysis", label: "AI Analysis", icon: Bot },
-  { href: "/test-cases", label: "Test Case Generator", icon: FileCheck2 },
+  { href: "/requirements-upload", label: "Requirements Upload", icon: UploadCloud },
+  { href: "/ai-analysis", label: "AI Analysis", icon: Bot },
+  { href: "/test-case-generator", label: "Test Case Generator", icon: FileCheck2 },
   { href: "/automation-readiness", label: "Automation Readiness", icon: Gauge },
   { href: "/code-generation", label: "Code Generation", icon: Code2 },
-  { href: "/exports", label: "Export Center", icon: Download },
+  { href: "/export-center", label: "Export Center", icon: Download },
+  { href: "/traceability", label: "Traceability", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
@@ -49,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className="flex-1 space-y-1 px-3 py-5" aria-label="Primary">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = pathname === item.href || legacyPathMatches(pathname, item.href);
               return (
                 <Link
                   key={item.href}
@@ -104,7 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className="flex gap-2 overflow-x-auto border-t border-slate-100 px-4 py-2 lg:hidden" aria-label="Mobile primary">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = pathname === item.href || legacyPathMatches(pathname, item.href);
               return (
                 <Link
                   key={item.href}
@@ -125,4 +127,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function legacyPathMatches(pathname: string, href: string) {
+  const legacy: Record<string, string> = {
+    "/requirements-upload": "/upload",
+    "/ai-analysis": "/analysis",
+    "/test-case-generator": "/test-cases",
+    "/export-center": "/exports"
+  };
+  return legacy[href] === pathname;
 }
