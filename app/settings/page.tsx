@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { ResetProjectWorkflow } from "@/components/reset-project-workflow";
+import { clearQaPlanetLocalData } from "@/lib/storage";
 
 const envVars = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -20,9 +21,7 @@ export default function SettingsPage() {
   const supabaseConfigured = hasSupabaseConfig();
 
   function clearLocalWorkspace() {
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith("qaplanet."))
-      .forEach((key) => localStorage.removeItem(key));
+    clearQaPlanetLocalData();
     setCleared(true);
   }
 

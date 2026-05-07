@@ -13,25 +13,36 @@ import { ResetProjectWorkflow } from "@/components/reset-project-workflow";
 import { GuidanceRail } from "@/components/layout/GuidanceRail";
 import { StatCard } from "@/components/ui/StatCard";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
-import { sampleAnalysis, sampleDocuments, sampleRequirements, sampleTestCases } from "@/lib/sample-data";
-import { sampleAnalysisItems } from "@/lib/phase2-sample-data";
 import type { AnalysisItem, Project, RequirementAnalysis, TestCase, UploadedDocument } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { isUuid, sanitizeProject } from "@/lib/project-context";
 
 const defaultProject: Project = {
-  name: "Customer portal QA initiative",
-  description: "Sample project for requirements analysis and automation generation."
+  name: "",
+  description: ""
+};
+
+const emptyAnalysis: RequirementAnalysis = {
+  summary: "",
+  businessRules: [],
+  userStories: [],
+  acceptanceCriteria: [],
+  risks: [],
+  gaps: [],
+  assumptions: [],
+  actors: [],
+  systems: [],
+  dataRequirements: []
 };
 
 export default function DashboardPage() {
   const [project, setProject] = useState<Project>(defaultProject);
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
-  const [analysis, setAnalysis] = useState<RequirementAnalysis>(sampleAnalysis);
-  const [analysisItems, setAnalysisItems] = useState<AnalysisItem[]>(sampleAnalysisItems);
-  const [testCases, setTestCases] = useState<TestCase[]>(sampleTestCases);
-  const [documents, setDocuments] = useState<UploadedDocument[]>(sampleDocuments);
+  const [analysis, setAnalysis] = useState<RequirementAnalysis>(emptyAnalysis);
+  const [analysisItems, setAnalysisItems] = useState<AnalysisItem[]>([]);
+  const [testCases, setTestCases] = useState<TestCase[]>([]);
+  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -39,13 +50,10 @@ export default function DashboardPage() {
     const storedProject = sanitizeProject(readJson(appStorageKeys.project, defaultProject));
     setProject(storedProject);
     writeJson(appStorageKeys.project, storedProject);
-    setAnalysis(readJson(appStorageKeys.analysis, sampleAnalysis));
-    setAnalysisItems(readJson(appStorageKeys.analysisItems, sampleAnalysisItems));
-    setTestCases(readJson(appStorageKeys.testCases, sampleTestCases));
-    setDocuments(readJson(appStorageKeys.documents, sampleDocuments));
-    if (!window.localStorage.getItem(appStorageKeys.requirements)) {
-      writeJson(appStorageKeys.requirements, sampleRequirements);
-    }
+    setAnalysis(readJson(appStorageKeys.analysis, emptyAnalysis));
+    setAnalysisItems(readJson(appStorageKeys.analysisItems, []));
+    setTestCases(readJson(appStorageKeys.testCases, []));
+    setDocuments(readJson(appStorageKeys.documents, []));
 
     async function loadSupabaseProject() {
       const supabase = createSupabaseBrowserClient();
