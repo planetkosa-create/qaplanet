@@ -142,6 +142,11 @@ Coverage areas to target in this response:
 ${coverageFocus.map((area) => `- ${area}`).join("\n")}
 
 Generation rules:
+- Return valid JSON only.
+- Do not include markdown.
+- Do not include explanation text.
+- Return an object with exactly one top-level property: test_cases.
+- test_cases must be an array.
 - Use requirement_sources.extracted_text, analysis_items, business rules, acceptance criteria, risks, gaps, and assumptions.
 - Explicitly inspect and use any "Suggested Test Coverage Areas" section in the BRD.
 - Do not generate only one test case per analysis item.
