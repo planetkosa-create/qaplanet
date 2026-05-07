@@ -25,7 +25,7 @@ export type RecommendedFramework = "Playwright" | "API" | "Manual";
 export type AutomationLanguage = "typescript" | "python";
 
 export type Project = {
-  id: string;
+  id?: string;
   name: string;
   description: string | null;
   created_at?: string;
