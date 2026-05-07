@@ -38,7 +38,7 @@ export default function CodeGenerationPage() {
       testCases.filter(
         (testCase) =>
           selectedIds.includes(testCase.id) &&
-          (testCase.approvalStatus ?? testCase.status) === "Approved" &&
+          (testCase.approvalStatus ?? testCase.status) !== "Rejected" &&
           (testCase.automationStatus ?? testCase.readiness) === "Automatable"
       ),
     [selectedIds, testCases]
@@ -111,7 +111,7 @@ export default function CodeGenerationPage() {
     <AppShell>
       <PageHeader
         title="Code Generation"
-        description="Generate Playwright TypeScript or Python automation for approved automatable test cases using environment placeholders and accessible locator guidance."
+        description="Generate Playwright TypeScript or Python automation for selected automatable test cases using environment placeholders and accessible locator guidance."
         actions={
           <>
             <select className="focus-ring min-h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold" value={language} onChange={(event) => setLanguage(event.target.value as AutomationLanguage)}>
@@ -130,7 +130,7 @@ export default function CodeGenerationPage() {
         <div className="space-y-5">
           <div className="card p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-950">Selected Approved Cases</h2>
+              <h2 className="text-lg font-semibold text-slate-950">Selected Automatable Cases</h2>
               <Badge tone="blue">{selectedTestCases.length} ready</Badge>
             </div>
             <div className="mt-4 space-y-3">
@@ -143,8 +143,8 @@ export default function CodeGenerationPage() {
                 ))
               ) : (
                 <EmptyState
-                  title="No approved automatable cases"
-                  description="Approve and select automatable test cases before generating scripts."
+                  title="No selected automatable cases"
+                  description="Select automatable test cases before generating scripts."
                   action={<Link href="/automation-readiness"><Button variant="secondary">Select Cases</Button></Link>}
                 />
               )}
