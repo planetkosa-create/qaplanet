@@ -419,3 +419,428 @@ end $$;
 alter table public.exports
 add constraint exports_export_type_check
 check (export_type in ('markdown', 'csv', 'json', 'excel', 'zip'));
+
+-- Phase 4 additions: integrations, collaboration, monetization readiness,
+-- GitHub-ready package tracking, and execution dashboard foundations.
+
+create table if not exists public.organizations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.organization_members (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('Owner', 'Admin', 'QA Lead', 'Tester', 'Reviewer', 'Viewer')),
+  created_at timestamptz not null default now(),
+  unique (organization_id, user_id)
+);
+
+create table if not exists public.project_members (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('Owner', 'Admin', 'QA Lead', 'Tester', 'Reviewer', 'Viewer')),
+  created_at timestamptz not null default now(),
+  unique (project_id, user_id)
+);
+
+create table if not exists public.invitations (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  email text not null,
+  role text not null check (role in ('Owner', 'Admin', 'QA Lead', 'Tester', 'Reviewer', 'Viewer')),
+  status text not null default 'Pending' check (status in ('Pending', 'Accepted', 'Revoked')),
+  invited_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  accepted_at timestamptz
+);
+
+create table if not exists public.plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique check (name in ('Free', 'Pro', 'Team', 'Enterprise')),
+  monthly_price numeric(10, 2) not null default 0,
+  max_projects integer,
+  max_documents integer,
+  max_ai_generations integer,
+  max_team_members integer,
+  features jsonb not null default '[]'::jsonb
+);
+
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  plan_id uuid references public.plans(id) on delete set null,
+  status text not null default 'active' check (status in ('active', 'trialing', 'past_due', 'canceled')),
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.usage_events (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  event_type text not null check (
+    event_type in (
+      'document_uploaded',
+      'ai_analysis_run',
+      'test_cases_generated',
+      'automation_generated',
+      'export_created',
+      'package_generated'
+    )
+  ),
+  quantity integer not null default 1,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.test_runs (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  run_name text not null,
+  framework text not null,
+  source text not null default 'Manual JSON import',
+  total_tests integer not null default 0,
+  passed integer not null default 0,
+  failed integer not null default 0,
+  skipped integer not null default 0,
+  duration_seconds integer not null default 0,
+  executed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  raw_results jsonb not null default '{}'::jsonb
+);
+
+create table if not exists public.test_run_results (
+  id uuid primary key default gen_random_uuid(),
+  test_run_id uuid not null references public.test_runs(id) on delete cascade,
+  test_case_id uuid references public.test_cases(id) on delete set null,
+  test_case_ref text,
+  title text not null,
+  status text not null check (status in ('passed', 'failed', 'skipped')),
+  duration_seconds integer not null default 0,
+  error_message text,
+  created_at timestamptz not null default now()
+);
+
+insert into public.plans (name, monthly_price, max_projects, max_documents, max_ai_generations, max_team_members, features)
+values
+  ('Free', 0, 1, 5, 20, 1, '["Single project", "Core exports", "Local package downloads"]'::jsonb),
+  ('Pro', 49, 5, 100, 500, 3, '["Advanced exports", "GitHub-ready packages", "More projects"]'::jsonb),
+  ('Team', 149, null, null, 2000, 15, '["Team collaboration", "Review workflow", "Execution dashboard"]'::jsonb),
+  ('Enterprise', 0, null, null, null, null, '["SSO ready", "Custom compliance", "Priority onboarding"]'::jsonb)
+on conflict (name) do update set
+  monthly_price = excluded.monthly_price,
+  max_projects = excluded.max_projects,
+  max_documents = excluded.max_documents,
+  max_ai_generations = excluded.max_ai_generations,
+  max_team_members = excluded.max_team_members,
+  features = excluded.features;
+
+alter table public.organizations enable row level security;
+alter table public.organization_members enable row level security;
+alter table public.project_members enable row level security;
+alter table public.invitations enable row level security;
+alter table public.plans enable row level security;
+alter table public.subscriptions enable row level security;
+alter table public.usage_events enable row level security;
+alter table public.test_runs enable row level security;
+alter table public.test_run_results enable row level security;
+
+drop policy if exists "organizations_member_access" on public.organizations;
+drop policy if exists "organization_members_member_access" on public.organization_members;
+drop policy if exists "project_members_member_access" on public.project_members;
+drop policy if exists "invitations_admin_access" on public.invitations;
+drop policy if exists "plans_read_all" on public.plans;
+drop policy if exists "subscriptions_member_read" on public.subscriptions;
+drop policy if exists "usage_events_member_access" on public.usage_events;
+drop policy if exists "test_runs_project_access" on public.test_runs;
+drop policy if exists "test_run_results_project_access" on public.test_run_results;
+
+create policy "organizations_member_access" on public.organizations
+for all using (
+  owner_id = auth.uid()
+  or exists (
+    select 1 from public.organization_members om
+    where om.organization_id = organizations.id
+      and om.user_id = auth.uid()
+  )
+) with check (owner_id = auth.uid());
+
+create policy "organization_members_member_access" on public.organization_members
+for all using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.organizations o
+    where o.id = organization_members.organization_id
+      and o.owner_id = auth.uid()
+  )
+) with check (
+  exists (
+    select 1 from public.organizations o
+    where o.id = organization_members.organization_id
+      and o.owner_id = auth.uid()
+  )
+);
+
+create policy "project_members_member_access" on public.project_members
+for all using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.projects p
+    where p.id = project_members.project_id
+      and p.owner_id = auth.uid()
+  )
+) with check (
+  exists (
+    select 1 from public.projects p
+    where p.id = project_members.project_id
+      and p.owner_id = auth.uid()
+  )
+);
+
+create policy "invitations_admin_access" on public.invitations
+for all using (
+  exists (
+    select 1 from public.organizations o
+    where o.id = invitations.organization_id
+      and o.owner_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.organization_members om
+    where om.organization_id = invitations.organization_id
+      and om.user_id = auth.uid()
+      and om.role in ('Owner', 'Admin')
+  )
+) with check (
+  exists (
+    select 1 from public.organizations o
+    where o.id = invitations.organization_id
+      and o.owner_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.organization_members om
+    where om.organization_id = invitations.organization_id
+      and om.user_id = auth.uid()
+      and om.role in ('Owner', 'Admin')
+  )
+);
+
+create policy "plans_read_all" on public.plans
+for select using (true);
+
+create policy "subscriptions_member_read" on public.subscriptions
+for select using (
+  exists (
+    select 1 from public.organizations o
+    where o.id = subscriptions.organization_id
+      and o.owner_id = auth.uid()
+  )
+  or exists (
+    select 1 from public.organization_members om
+    where om.organization_id = subscriptions.organization_id
+      and om.user_id = auth.uid()
+      and om.role in ('Owner', 'Admin')
+  )
+);
+
+create policy "usage_events_member_access" on public.usage_events
+for all using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.organizations o
+    where o.id = usage_events.organization_id
+      and o.owner_id = auth.uid()
+  )
+) with check (user_id = auth.uid() or user_id is null);
+
+create policy "test_runs_project_access" on public.test_runs
+for all using (
+  owner_id = auth.uid()
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = test_runs.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  owner_id = auth.uid()
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = test_runs.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+  )
+);
+
+create policy "test_run_results_project_access" on public.test_run_results
+for all using (
+  exists (
+    select 1 from public.test_runs tr
+    where tr.id = test_run_results.test_run_id
+      and (
+        tr.owner_id = auth.uid()
+        or exists (
+          select 1 from public.project_members pm
+          where pm.project_id = tr.project_id
+            and pm.user_id = auth.uid()
+        )
+      )
+  )
+) with check (
+  exists (
+    select 1 from public.test_runs tr
+    where tr.id = test_run_results.test_run_id
+      and (
+        tr.owner_id = auth.uid()
+        or exists (
+          select 1 from public.project_members pm
+          where pm.project_id = tr.project_id
+            and pm.user_id = auth.uid()
+            and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+        )
+      )
+  )
+);
+
+-- Extend core project workflow policies so future project members can read
+-- and collaborate inside assigned projects while keeping owner isolation.
+drop policy if exists "projects_crud_own" on public.projects;
+drop policy if exists "requirement_sources_crud_own" on public.requirement_sources;
+drop policy if exists "analysis_items_crud_own" on public.analysis_items;
+drop policy if exists "test_cases_crud_own" on public.test_cases;
+drop policy if exists "automation_assessments_crud_own" on public.automation_assessments;
+drop policy if exists "generated_automation_crud_own" on public.generated_automation;
+drop policy if exists "exports_crud_own" on public.exports;
+
+create policy "projects_crud_own" on public.projects
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = projects.id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = projects.id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin')
+  )
+);
+
+create policy "requirement_sources_crud_own" on public.requirement_sources
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = requirement_sources.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = requirement_sources.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+  )
+);
+
+create policy "analysis_items_crud_own" on public.analysis_items
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = analysis_items.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = analysis_items.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+  )
+);
+
+create policy "test_cases_crud_own" on public.test_cases
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = test_cases.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = test_cases.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester', 'Reviewer')
+  )
+);
+
+create policy "automation_assessments_crud_own" on public.automation_assessments
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = automation_assessments.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = automation_assessments.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+  )
+);
+
+create policy "generated_automation_crud_own" on public.generated_automation
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = generated_automation.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = generated_automation.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+  )
+);
+
+create policy "exports_crud_own" on public.exports
+for all using (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = exports.project_id
+      and pm.user_id = auth.uid()
+  )
+) with check (
+  auth.uid() = owner_id
+  or exists (
+    select 1 from public.project_members pm
+    where pm.project_id = exports.project_id
+      and pm.user_id = auth.uid()
+      and pm.role in ('Owner', 'Admin', 'QA Lead', 'Tester')
+  )
+);
