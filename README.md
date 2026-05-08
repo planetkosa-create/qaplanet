@@ -7,13 +7,13 @@ Domain: `qaplanet.ca`
 ## What This MVP Includes
 
 - Next.js App Router with TypeScript and Tailwind CSS
-- Clean enterprise SaaS UI with landing page, auth, dashboard, upload, AI analysis, generated test cases, automation readiness, code generation, exports, and settings
+- Clean enterprise SaaS UI with landing page, auth, dashboard, projects, upload, AI analysis, generated test cases, automation readiness, code generation, exports, execution, team, billing, integrations, and settings
 - Supabase Auth login and sign up
 - Supabase Storage upload support for `.docx`, `.pdf`, `.xlsx`, and `.txt`
 - Supabase Postgres schema for the requested product tables
 - OpenAI API routes for requirement analysis, test case generation, automation readiness, and Playwright TypeScript generation
 - Playwright TypeScript and Playwright Python automation generation
-- Export support for CSV, Markdown, JSON, and Excel
+- Export support for CSV, Markdown, JSON, Excel, Azure DevOps CSV, Jira CSV, Xray JSON, Markdown test plans, and GitHub-ready ZIP packages
 - Traceability matrix from requirement source to analysis item to test case to generated automation
 - Seed sample project, sample requirements, sample test cases, and sample generated script
 - Loading states and basic error handling
@@ -37,9 +37,14 @@ app/
   code-generation/page.tsx
   export-center/page.tsx
   dashboard/page.tsx
+  execution/page.tsx
   exports/page.tsx
+  integrations/page.tsx
   login/page.tsx
   page.tsx
+  billing/page.tsx
+  team/page.tsx
+  projects/page.tsx
   requirements-upload/page.tsx
   settings/page.tsx
   traceability/page.tsx
@@ -120,6 +125,15 @@ Required tables are included:
 - `generated_scripts`
 - `generated_automation`
 - `exports`
+- `organizations`
+- `organization_members`
+- `project_members`
+- `invitations`
+- `plans`
+- `subscriptions`
+- `usage_events`
+- `test_runs`
+- `test_run_results`
 
 Storage bucket:
 
@@ -194,6 +208,16 @@ Use these production routes:
 - `/traceability`: view source-to-analysis-to-test-to-script mapping
 
 Legacy Phase 1 routes such as `/upload`, `/analysis`, `/test-cases`, and `/exports` still work.
+
+## Phase 4 Pages
+
+- `/projects`: project workspace management
+- `/execution`: import JSON test execution results and review run history
+- `/team`: organization members and pending invitations
+- `/billing`: plan cards and usage summary, with payments marked coming soon
+- `/integrations`: Azure DevOps, Jira/Xray, GitHub ZIP, Slack, and email readiness
+
+Phase 4 adds integration-ready exports only. Live Azure DevOps, Jira, GitHub OAuth push, Slack, email, and Stripe flows are intentionally marked coming soon.
 
 ## First-Run Demo Mode
 
