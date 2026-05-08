@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  CreditCard,
   Code2,
   Download,
   FileCheck2,
@@ -14,7 +15,9 @@ import {
   HelpCircle,
   LayoutDashboard,
   MessageSquareText,
+  PlayCircle,
   Settings,
+  Users,
   UploadCloud,
   X
 } from "lucide-react";
@@ -29,8 +32,10 @@ const navItems = [
   { href: "/automation-readiness", label: "Automation Readiness", icon: Gauge },
   { href: "/code-generation", label: "Code Generation", icon: Code2 },
   { href: "/traceability", label: "Traceability", icon: GitBranch },
-  { href: "/coverage", label: "Coverage", icon: Gauge },
   { href: "/export-center", label: "Export Center", icon: Download },
+  { href: "/execution", label: "Execution", icon: PlayCircle },
+  { href: "/team", label: "Team", icon: Users },
+  { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
