@@ -73,6 +73,30 @@ create table if not exists public.plans (
   updated_at timestamptz not null default now()
 );
 
+-- If plans already existed from an earlier partial setup, create table if not
+-- exists will not add missing columns. Keep this block before the seed upsert.
+alter table public.plans add column if not exists name text;
+alter table public.plans add column if not exists monthly_price numeric(10, 2) not null default 0;
+alter table public.plans add column if not exists max_projects integer;
+alter table public.plans add column if not exists max_documents integer;
+alter table public.plans add column if not exists max_ai_generations integer;
+alter table public.plans add column if not exists max_team_members integer;
+alter table public.plans add column if not exists features jsonb not null default '[]'::jsonb;
+alter table public.plans add column if not exists created_at timestamptz not null default now();
+alter table public.plans add column if not exists updated_at timestamptz not null default now();
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'plans_name_key'
+      and conrelid = 'public.plans'::regclass
+  ) then
+    alter table public.plans add constraint plans_name_key unique (name);
+  end if;
+end $$;
+
 create table if not exists public.subscriptions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
