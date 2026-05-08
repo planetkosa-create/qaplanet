@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { Download, FileArchive, FileJson, FileSpreadsheet, FileText, Loader2, Table2 } from "lucide-react";
+import { Download, FileArchive, FileJson, FileSpreadsheet, FileText, Github, Loader2, Send, Table2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,16 +14,20 @@ import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { getStoredProjectId } from "@/lib/project-context";
 import { sampleTestCases } from "@/lib/sample-data";
 import { buildSampleTraceability, sampleAnalysisItems, sampleAutomationAssessments, sampleGeneratedAutomations, sampleRequirementSources } from "@/lib/phase2-sample-data";
-import type { AnalysisItem, AutomationAssessment, ExportHistoryItem, GeneratedScript, Project, RequirementSource, TestCase, TraceabilityRow } from "@/lib/types";
+import type { AnalysisItem, AutomationAssessment, ExportHistoryItem, GeneratedScript, Project, RequirementSource, TestCase, TraceabilityRow, UsageEvent } from "@/lib/types";
 import {
   analysisItemsToCsv,
+  azureDevOpsTestCasesToCsv,
   downloadTextFile,
   downloadWorkbook,
   itemsToMarkdown,
+  jiraTestCasesToCsv,
+  markdownTestPlan,
   readinessToCsv,
   testCasesToCsv,
   testCasesToMarkdown,
-  traceabilityToCsv
+  traceabilityToCsv,
+  xrayTestCasesToJson
 } from "@/lib/exports";
 
 type ExportScope = "Test cases" | "Analysis items" | "Automation readiness" | "Traceability matrix";
@@ -48,6 +52,15 @@ export default function ExportsPage() {
   const [scripts, setScripts] = useState<GeneratedScript[]>(sampleGeneratedAutomations);
   const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([]);
   const [packageLoading, setPackageLoading] = useState(false);
+  const [integrationLoading, setIntegrationLoading] = useState("");
+  const [githubPackageLoading, setGithubPackageLoading] = useState(false);
+  const [managementOptions, setManagementOptions] = useState({
+    areaPath: "",
+    iterationPath: "",
+    tags: "qaplanet",
+    assignedTo: ""
+  });
+  const [githubPackageType, setGithubPackageType] = useState<"typescript" | "python">("typescript");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -158,6 +171,97 @@ export default function ExportsPage() {
     setMessage(`${scope} exported as ${format}.`);
   }
 
+  async function exportIntegration(type: "azure" | "jira" | "xray" | "markdown") {
+    setIntegrationLoading(type);
+    setMessage("");
+    try {
+      const date = new Date().toISOString().slice(0, 10);
+      const options = managementOptions;
+
+      if (type === "azure") {
+        const fileName = `qaplanet-azure-devops-test-cases-${date}.csv`;
+        downloadTextFile(fileName, azureDevOpsTestCasesToCsv(testCases, options), "text/csv");
+        await saveExportMetadata("Test cases", "CSV", fileName, testCases.length);
+        recordExport({ fileName, exportType: "Azure DevOps Test Cases CSV", rowCount: testCases.length });
+        setMessage("Azure DevOps CSV exported.");
+      }
+
+      if (type === "jira") {
+        const fileName = `qaplanet-jira-test-cases-${date}.csv`;
+        downloadTextFile(fileName, jiraTestCasesToCsv(testCases, options), "text/csv");
+        await saveExportMetadata("Test cases", "CSV", fileName, testCases.length);
+        recordExport({ fileName, exportType: "Jira CSV", rowCount: testCases.length });
+        setMessage("Jira CSV exported.");
+      }
+
+      if (type === "xray") {
+        const fileName = `qaplanet-xray-tests-${date}.json`;
+        downloadTextFile(fileName, xrayTestCasesToJson(testCases, options), "application/json");
+        await saveExportMetadata("Test cases", "JSON", fileName, testCases.length);
+        recordExport({ fileName, exportType: "Xray JSON", rowCount: testCases.length });
+        setMessage("Xray JSON exported.");
+      }
+
+      if (type === "markdown") {
+        const fileName = `qaplanet-markdown-test-plan-${date}.md`;
+        downloadTextFile(fileName, markdownTestPlan(testCases, `${project.name || "QAplanet"} Test Plan`), "text/markdown");
+        await saveExportMetadata("Test cases", "Markdown", fileName, testCases.length);
+        recordExport({ fileName, exportType: "Markdown Test Plan", rowCount: testCases.length });
+        setMessage("Markdown test plan exported.");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Integration export failed.");
+    } finally {
+      setIntegrationLoading("");
+    }
+  }
+
+  async function downloadGithubReadyPackage() {
+    setGithubPackageLoading(true);
+    setMessage("");
+    try {
+      const zip = new JSZip();
+      const root = zip.folder("qaplanet-github-automation-package");
+      if (!root) {
+        throw new Error("Could not create GitHub automation package.");
+      }
+
+      const matchingFeature = scripts.find((script) => script.language === "gherkin");
+      const matchingPython = scripts.find((script) => script.language === "python");
+      const matchingTypescript = scripts.find((script) => script.language === "typescript");
+
+      root.file(".env.example", ["QAPLANET_BASE_URL=", "QAPLANET_TEST_USER=", "QAPLANET_TEST_PASSWORD="].join("\n"));
+      root.file(".gitignore", ["node_modules/", ".env", "reports/", "test-results/", "__pycache__/", ".pytest_cache/"].join("\n"));
+      root.file("README.md", buildGithubPackageReadme(githubPackageType, testCases.length));
+      root.file("features/qaplanet-generated.feature", matchingFeature?.code || placeholderFeature(project.name));
+      root.file("data/qaplanet-test-data.json", JSON.stringify(rowsForScope("Test cases", { testCases, analysisItems, readiness, traceability }), null, 2));
+      root.file("utils/README.md", "Add shared configuration, logging, fixture, and test data helpers here.\n");
+      root.file("pages/README.md", "Add page objects and reusable screen interactions here.\n");
+
+      if (githubPackageType === "python") {
+        root.file("steps/qaplanet_steps.py", matchingPython?.code || "# Generate Python pytest-bdd step definitions in QAplanet before replacing this placeholder.\n");
+        root.file("tests/README.md", "Pytest-bdd scenarios are discovered from feature files and step definitions. Add non-BDD pytest tests here if needed.\n");
+        root.file("pytest.ini", "[pytest]\nmarkers =\n    smoke: smoke tests\n    regression: regression tests\n    ui: UI tests\n");
+        root.file("requirements.txt", ["pytest", "pytest-bdd", "playwright", "allure-pytest", "python-dotenv"].join("\n"));
+      } else {
+        root.file("steps/README.md", "Step definition files are used by BDD packages. TypeScript Playwright specs live under tests/.\n");
+        root.file("tests/qaplanet-generated.spec.ts", matchingTypescript?.code || "// Generate Playwright TypeScript automation in QAplanet before replacing this placeholder.\n");
+        root.file("playwright.config.ts", buildGithubPlaywrightConfig());
+        root.file("package.json", buildGithubPackageJson());
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const fileName = `qaplanet-github-${githubPackageType}-automation-package.zip`;
+      saveAs(blob, fileName);
+      recordExport({ fileName, exportType: "GitHub-ready Automation Package", rowCount: testCases.length });
+      setMessage("GitHub-ready automation package downloaded.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "GitHub automation package generation failed.");
+    } finally {
+      setGithubPackageLoading(false);
+    }
+  }
+
   function recordExport(item: { fileName: string; exportType: string; rowCount?: number }) {
     const nextHistory: ExportHistoryItem[] = [
       {
@@ -171,6 +275,7 @@ export default function ExportsPage() {
     ].slice(0, 20);
     setExportHistory(nextHistory);
     writeJson(appStorageKeys.exportHistory, nextHistory);
+    recordUsageEvent(item.exportType.includes("Package") ? "package_generated" : "export_created");
   }
 
   return (
@@ -213,6 +318,77 @@ export default function ExportsPage() {
             >
               {packageLoading ? "Preparing ZIP" : "Download ZIP"}
             </Button>
+          </div>
+        </article>
+      </section>
+
+      <section className="mb-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <article className="card p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Send className="size-5 text-brand-blue" aria-hidden />
+                <h2 className="text-lg font-bold text-slate-950">Test Management Exports</h2>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Generate import-ready artifacts for Azure DevOps, Jira, Xray, and stakeholder test planning without pushing to live APIs.
+              </p>
+            </div>
+            <Badge tone="teal">{testCases.length} test cases</Badge>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <FieldText label="Area Path" value={managementOptions.areaPath} onChange={(value) => setManagementOptions((current) => ({ ...current, areaPath: value }))} placeholder="QAplanet\\Portal" />
+            <FieldText label="Iteration Path" value={managementOptions.iterationPath} onChange={(value) => setManagementOptions((current) => ({ ...current, iterationPath: value }))} placeholder="QAplanet\\Release 1" />
+            <FieldText label="Tags" value={managementOptions.tags} onChange={(value) => setManagementOptions((current) => ({ ...current, tags: value }))} placeholder="qaplanet;regression" />
+            <FieldText label="Assigned To" value={managementOptions.assignedTo} onChange={(value) => setManagementOptions((current) => ({ ...current, assignedTo: value }))} placeholder="qa.lead@example.com" />
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button variant="secondary" disabled={integrationLoading === "azure"} onClick={() => exportIntegration("azure")} icon={integrationLoading === "azure" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}>
+              Export Azure DevOps CSV
+            </Button>
+            <Button variant="secondary" disabled={integrationLoading === "jira"} onClick={() => exportIntegration("jira")} icon={integrationLoading === "jira" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}>
+              Export Jira CSV
+            </Button>
+            <Button variant="secondary" disabled={integrationLoading === "xray"} onClick={() => exportIntegration("xray")} icon={integrationLoading === "xray" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}>
+              Export Xray JSON
+            </Button>
+            <Button variant="secondary" disabled={integrationLoading === "markdown"} onClick={() => exportIntegration("markdown")} icon={integrationLoading === "markdown" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileText className="size-4" aria-hidden />}>
+              Export Markdown Test Plan
+            </Button>
+          </div>
+        </article>
+
+        <article className="card p-5">
+          <div className="flex items-center gap-2">
+            <Github className="size-5 text-slate-950" aria-hidden />
+            <h2 className="text-lg font-bold text-slate-950">GitHub Automation Package</h2>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Prepare a repository-ready ZIP with automation assets, environment placeholders, README, and ignore rules.
+          </p>
+          <label className="mt-4 block">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">Package type</span>
+            <select
+              className="focus-ring min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800"
+              value={githubPackageType}
+              onChange={(event) => setGithubPackageType(event.target.value as "typescript" | "python")}
+            >
+              <option value="typescript">Playwright TypeScript Package</option>
+              <option value="python">Playwright Python pytest-bdd Package</option>
+            </select>
+          </label>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button onClick={downloadGithubReadyPackage} disabled={githubPackageLoading} icon={githubPackageLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FileArchive className="size-4" aria-hidden />}>
+              Generate GitHub-ready ZIP
+            </Button>
+          </div>
+          <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-bold text-slate-950">GitHub push coming soon</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Connect GitHub -> Select repository -> Create branch -> Commit automation package -> Open pull request.
+            </p>
           </div>
         </article>
       </section>
@@ -530,7 +706,9 @@ function rowToGeneratedScript(row: Record<string, unknown>): GeneratedScript {
     code: stringValue(row.code),
     createdAt: stringValue(row.created_at) || new Date().toISOString(),
     language,
-    framework: language === "gherkin" ? "Gherkin Feature" : "Playwright"
+    framework: language === "gherkin" ? "Gherkin Feature" : language === "python" ? "Playwright Python" : "Playwright",
+    generationType: stringValue(row.generation_type).includes("Python BDD") ? "pythonBdd" : language === "gherkin" ? "feature" : "script",
+    linkedFeatureFileName: stringValue(row.linked_feature_file_name) || undefined
   };
 }
 
@@ -544,6 +722,91 @@ function placeholderJson(message: string) {
 
 function placeholderMarkdown(title: string, message: string) {
   return [`# ${title}`, "", message].join("\n");
+}
+
+function placeholderFeature(projectName: string) {
+  return [
+    "# Purpose: Placeholder feature file generated for a GitHub-ready QAplanet package.",
+    "",
+    "@qaplanet",
+    `Feature: ${projectName || "QAplanet"} generated automation`,
+    "",
+    "  Scenario: Replace this placeholder with generated Gherkin",
+    "    Given generated QAplanet test cases are available",
+    "    When the team generates a feature file",
+    "    Then this placeholder is replaced with business-readable scenarios"
+  ].join("\n");
+}
+
+function buildGithubPackageReadme(packageType: "typescript" | "python", testCaseCount: number) {
+  const setup =
+    packageType === "python"
+      ? ["1. Create a virtual environment.", "2. Run `pip install -r requirements.txt`.", "3. Run `playwright install`.", "4. Set `QAPLANET_BASE_URL` and test user environment variables.", "5. Run `pytest`."]
+      : ["1. Run `npm install`.", "2. Run `npx playwright install`.", "3. Set `QAPLANET_BASE_URL` and test user environment variables.", "4. Run `npm test`."];
+
+  return [
+    "# QAplanet GitHub Automation Package",
+    "",
+    `Package type: ${packageType === "python" ? "Playwright Python pytest-bdd" : "Playwright TypeScript"}`,
+    `Selected test cases: ${testCaseCount}`,
+    "",
+    "## Setup",
+    "",
+    ...setup,
+    "",
+    "## Security",
+    "",
+    "No credentials are included. Use `.env.example` as a template and store real secrets in your CI/CD secret manager."
+  ].join("\n");
+}
+
+function buildGithubPlaywrightConfig() {
+  return `import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./tests",
+  use: {
+    baseURL: process.env.QAPLANET_BASE_URL,
+    trace: "on-first-retry"
+  },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }]
+});
+`;
+}
+
+function buildGithubPackageJson() {
+  return JSON.stringify(
+    {
+      name: "qaplanet-automation-package",
+      version: "1.0.0",
+      private: true,
+      scripts: {
+        test: "playwright test",
+        "test:headed": "playwright test --headed"
+      },
+      devDependencies: {
+        "@playwright/test": "^1.44.0",
+        typescript: "^5.0.0"
+      }
+    },
+    null,
+    2
+  );
+}
+
+function recordUsageEvent(eventType: UsageEvent["eventType"]) {
+  const events = readJson<UsageEvent[]>(appStorageKeys.usageEvents, []);
+  const nextEvents: UsageEvent[] = [
+    {
+      id: crypto.randomUUID(),
+      projectId: getStoredProjectId(),
+      eventType,
+      quantity: 1,
+      createdAt: new Date().toISOString()
+    },
+    ...events
+  ].slice(0, 100);
+  writeJson(appStorageKeys.usageEvents, nextEvents);
 }
 
 function safeFileName(value: string) {
@@ -631,4 +894,28 @@ function descriptionForScope(scope: ExportScope) {
   if (scope === "Analysis items") return "Business rules, stories, criteria, risks, assumptions, actors, integrations, and data needs.";
   if (scope === "Automation readiness") return "Readiness classifications, confidence scores, reasons, and recommended framework.";
   return "Requirement source to analysis item to test case to generated automation mapping.";
+}
+
+function FieldText({
+  label,
+  value,
+  onChange,
+  placeholder
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
+      <input
+        className="focus-ring min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 placeholder:text-slate-400"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </label>
+  );
 }

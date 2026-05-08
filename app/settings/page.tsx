@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Database, KeyRound, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Database, KeyRound, PlugZap, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,25 @@ export default function SettingsPage() {
             <li className="rounded-md bg-slate-50 p-3">Storage bucket: requirement-documents.</li>
             <li className="rounded-md bg-slate-50 p-3">RLS policies keep user-owned project data scoped to each authenticated account.</li>
           </ul>
+        </div>
+
+        <div className="card p-5 xl:col-span-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-blue-50 text-brand-blue">
+                <PlugZap className="size-5" aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Integrations</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  Review Azure DevOps, Jira/Xray, GitHub package, Slack, and email integration readiness.
+                </p>
+              </div>
+            </div>
+            <Link href="/integrations">
+              <Button variant="secondary">Open Integrations</Button>
+            </Link>
+          </div>
         </div>
 
         <div className="card p-5 xl:col-span-2">

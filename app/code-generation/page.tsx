@@ -17,6 +17,7 @@ import { sampleScript, sampleTestCases } from "@/lib/sample-data";
 import { sampleGeneratedAutomations, samplePythonScript } from "@/lib/phase2-sample-data";
 import type { AutomationLanguage, GeneratedScript, TestCase } from "@/lib/types";
 import { downloadTextFile } from "@/lib/exports";
+import { buildPythonBddPackageFiles, generatePythonBddStepDefinitions } from "@/lib/generation/python-bdd";
 
 export default function CodeGenerationPage() {
   const [testCases, setTestCases] = useState<TestCase[]>(sampleTestCases);
@@ -53,6 +54,41 @@ export default function CodeGenerationPage() {
     setLoading(true);
     setMessage("");
     try {
+      if (language === "python") {
+        const approvedAutomatableCases = getApprovedAutomatableCases(selectedTestCases);
+
+        if (!approvedAutomatableCases.length) {
+          throw new Error("Select at least one approved automatable test case before generating Python step definitions.");
+        }
+
+        const featureScript = ensureFeatureScriptForCases(approvedAutomatableCases, scripts, activeScript);
+        const project = readJson(appStorageKeys.project, { name: "QAplanet" });
+        const pythonFile = generatePythonBddStepDefinitions({
+          featureFileName: featureScript.name,
+          featureContent: featureScript.code,
+          projectName: project.name,
+          testCases: approvedAutomatableCases
+        });
+        const nextScript: GeneratedScript = {
+          id: crypto.randomUUID(),
+          testCaseIds: approvedAutomatableCases.map((testCase) => testCase.id),
+          name: pythonFile.fileName,
+          code: pythonFile.content,
+          createdAt: new Date().toISOString(),
+          language: "python",
+          framework: "Playwright Python",
+          generationType: "pythonBdd",
+          linkedFeatureFileName: featureScript.name
+        };
+        const nextScripts = mergeGeneratedScripts([nextScript, featureScript], scripts);
+        setActiveScript(nextScript);
+        setScripts(nextScripts);
+        writeJson(appStorageKeys.generatedScript, nextScript);
+        writeJson(appStorageKeys.generatedAutomations, nextScripts);
+        setMessage(`Generated Pytest-BDD step definitions from ${featureScript.name}.`);
+        return;
+      }
+
       const response = await fetch("/api/ai/generate-scripts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,11 +139,7 @@ export default function CodeGenerationPage() {
     setFeatureLoading(true);
     setMessage("");
     try {
-      const approvedAutomatableCases = selectedTestCases.filter(
-        (testCase) =>
-          (testCase.approvalStatus ?? testCase.status) === "Approved" &&
-          (testCase.automationStatus ?? testCase.readiness) === "Automatable"
-      );
+      const approvedAutomatableCases = getApprovedAutomatableCases(selectedTestCases);
 
       if (!approvedAutomatableCases.length) {
         throw new Error("Select at least one approved automatable test case before generating a feature file.");
@@ -153,7 +185,7 @@ export default function CodeGenerationPage() {
         framework: "Gherkin Feature",
         generationType: "feature"
       };
-      const nextScripts = [nextScript, ...scripts.filter((script) => script.id !== nextScript.id)];
+      const nextScripts = mergeGeneratedScripts([nextScript], scripts);
       setActiveScript(nextScript);
       setScripts(nextScripts);
       writeJson(appStorageKeys.generatedScript, nextScript);
@@ -170,6 +202,59 @@ export default function CodeGenerationPage() {
     setPackageLoading(true);
     setMessage("");
     try {
+      if (language === "python") {
+        const approvedAutomatableCases = getApprovedAutomatableCases(selectedTestCases);
+
+        if (!approvedAutomatableCases.length) {
+          throw new Error("Select at least one approved automatable test case before generating a Python BDD package.");
+        }
+
+        const featureScript = ensureFeatureScriptForCases(approvedAutomatableCases, scripts, activeScript);
+        const project = readJson(appStorageKeys.project, { name: "QAplanet" });
+        const packageFiles = buildPythonBddPackageFiles({
+          featureFileName: featureScript.name,
+          featureContent: featureScript.code,
+          projectName: project.name,
+          testCases: approvedAutomatableCases
+        });
+        const zip = new JSZip();
+        const root = zip.folder("qaplanet-python-bdd-package");
+        if (!root) {
+          throw new Error("Could not create Python BDD package.");
+        }
+
+        root.file(`features/${packageFiles.featureFileName}`, packageFiles.featureContent);
+        root.file(`steps/${packageFiles.stepsFile.fileName}`, packageFiles.stepsFile.content);
+        root.file(`pages/${packageFiles.pageObjectFileName}`, packageFiles.pageObjectContent);
+        root.file(`data/${packageFiles.testDataFileName}`, packageFiles.testDataContent);
+        root.file("utils/config_loader.py", packageFiles.configLoaderContent);
+        root.file("utils/step_logger.py", packageFiles.stepLoggerContent);
+        root.file("pytest.ini", packageFiles.pytestIniContent);
+        root.file("requirements.txt", packageFiles.requirementsContent);
+        root.file("README.md", packageFiles.readmeContent);
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        saveAs(blob, "qaplanet-python-bdd-package.zip");
+        const generatedStepScript: GeneratedScript = {
+          id: crypto.randomUUID(),
+          testCaseIds: approvedAutomatableCases.map((testCase) => testCase.id),
+          name: packageFiles.stepsFile.fileName,
+          code: packageFiles.stepsFile.content,
+          createdAt: new Date().toISOString(),
+          language: "python",
+          framework: "Playwright Python",
+          generationType: "pythonBdd",
+          linkedFeatureFileName: featureScript.name
+        };
+        const nextScripts = mergeGeneratedScripts([generatedStepScript, featureScript], scripts);
+        setActiveScript(generatedStepScript);
+        setScripts(nextScripts);
+        writeJson(appStorageKeys.generatedScript, generatedStepScript);
+        writeJson(appStorageKeys.generatedAutomations, nextScripts);
+        setMessage("Full Pytest-BDD Playwright Python package downloaded.");
+        return;
+      }
+
       const zip = new JSZip();
       const root = zip.folder("qaplanet-playwright-package");
       if (!root) {
@@ -224,6 +309,13 @@ export default function CodeGenerationPage() {
       name: activeScript.name,
       language: activeScript.language ?? language,
       framework: activeScript.framework ?? (activeScript.language === "gherkin" ? "Gherkin Feature" : "Playwright"),
+      generation_type:
+        activeScript.generationType === "pythonBdd"
+          ? "Python BDD Step Definitions"
+          : activeScript.generationType === "feature"
+            ? "Gherkin Feature"
+            : activeScript.generationType ?? "script",
+      linked_feature_file_name: activeScript.linkedFeatureFileName ?? null,
       test_case_ids: activeScript.testCaseIds,
       code: activeScript.code
     });
@@ -307,7 +399,13 @@ export default function CodeGenerationPage() {
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-950">{fileName}</h2>
-              <p className="text-sm text-slate-500">{activeScript.language === "gherkin" ? "Gherkin Feature" : `Playwright ${activeScript.language === "python" ? "Python" : "TypeScript"}`}</p>
+              <p className="text-sm text-slate-500">
+                {activeScript.language === "gherkin"
+                  ? "Gherkin Feature"
+                  : activeScript.framework === "Playwright Python"
+                    ? "Pytest-BDD + Playwright Python"
+                    : `Playwright ${activeScript.language === "python" ? "Python" : "TypeScript"}`}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={saveScript} icon={<Save className="size-4" aria-hidden />}>Save Script</Button>
@@ -330,6 +428,62 @@ export default function CodeGenerationPage() {
       {message ? <p className="mt-4 rounded-md bg-slate-100 p-3 text-sm text-slate-700">{message}</p> : null}
     </AppShell>
   );
+}
+
+function getApprovedAutomatableCases(testCases: TestCase[]) {
+  return testCases.filter(
+    (testCase) =>
+      (testCase.approvalStatus ?? testCase.status) === "Approved" &&
+      (testCase.automationStatus ?? testCase.readiness) === "Automatable"
+  );
+}
+
+function ensureFeatureScriptForCases(testCases: TestCase[], scripts: GeneratedScript[], activeScript: GeneratedScript) {
+  const selectedIds = new Set(testCases.map((testCase) => testCase.id));
+  const matchingFeature =
+    activeScript.language === "gherkin" && overlapsTestCases(activeScript, selectedIds)
+      ? activeScript
+      : scripts.find((script) => script.language === "gherkin" && overlapsTestCases(script, selectedIds));
+
+  if (matchingFeature) {
+    return matchingFeature;
+  }
+
+  const featureTitle = inferFeatureTitle(testCases);
+
+  return {
+    id: crypto.randomUUID(),
+    testCaseIds: testCases.map((testCase) => testCase.id),
+    name: slugifyFeatureName(featureTitle),
+    code: generateGherkinFeatureFromTestCases(testCases),
+    createdAt: new Date().toISOString(),
+    language: "gherkin",
+    framework: "Gherkin Feature",
+    generationType: "feature"
+  } satisfies GeneratedScript;
+}
+
+function overlapsTestCases(script: GeneratedScript, selectedIds: Set<string>) {
+  if (!script.testCaseIds.length || !selectedIds.size) {
+    return false;
+  }
+  return script.testCaseIds.some((id) => selectedIds.has(id));
+}
+
+function mergeGeneratedScripts(newScripts: GeneratedScript[], existingScripts: GeneratedScript[]) {
+  const seen = new Set<string>();
+  const merged: GeneratedScript[] = [];
+
+  [...newScripts, ...existingScripts].forEach((script) => {
+    const key = `${script.language ?? "typescript"}:${script.name}:${script.testCaseIds.join("|")}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    merged.push(script);
+  });
+
+  return merged;
 }
 
 function buildSpecFile(testCases: TestCase[]) {

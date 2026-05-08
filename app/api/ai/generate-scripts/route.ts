@@ -3,6 +3,7 @@ import { buildAutomationScriptPrompt, buildScriptPrompt, getOpenAIClient, safeJs
 import { sampleScript } from "@/lib/sample-data";
 import { samplePythonScript } from "@/lib/phase2-sample-data";
 import type { AutomationLanguage, GeneratedScript, TestCase } from "@/lib/types";
+import { generatePythonBddStepDefinitions } from "@/lib/generation/python-bdd";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,12 +18,15 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as {
       testCases?: TestCase[];
       language?: AutomationLanguage;
-      generationType?: "script" | "pageObject" | "fullPackage" | "apiTests" | "feature";
+      generationType?: "script" | "pageObject" | "fullPackage" | "apiTests" | "feature" | "pythonBdd";
       framework?: string;
       projectId?: string;
       testCaseIds?: string[];
+      featureContent?: string;
+      featureFileName?: string;
+      projectName?: string;
     };
-    const { testCases, language = "typescript", generationType } = payload;
+    const { testCases, language = "typescript", generationType, framework } = payload;
 
     if (!testCases?.length) {
       return NextResponse.json({ error: "Select at least one test case." }, { status: 400 });
@@ -74,6 +78,36 @@ export async function POST(request: Request) {
           content: fallbackContent
         });
       }
+    }
+
+    if (language === "python" || framework === "Playwright Python") {
+      const featureContent = payload.featureContent || generateGherkinFeatureFromTestCases(testCases);
+      const featureFileName = payload.featureFileName || slugifyFeatureName(inferFeatureTitle(testCases));
+      const pythonFile = generatePythonBddStepDefinitions({
+        featureFileName,
+        featureContent,
+        projectName: payload.projectName ?? "QAplanet",
+        testCases
+      });
+      const script: GeneratedScript = {
+        id: crypto.randomUUID(),
+        testCaseIds: testCases.map((testCase) => testCase.id),
+        name: pythonFile.fileName,
+        code: pythonFile.content,
+        createdAt: new Date().toISOString(),
+        language: "python",
+        framework: "Playwright Python",
+        generationType: "pythonBdd",
+        linkedFeatureFileName: featureFileName
+      };
+
+      return NextResponse.json({
+        success: true,
+        fileName: pythonFile.fileName,
+        language: "python",
+        content: pythonFile.content,
+        script
+      });
     }
 
     const openai = getOpenAIClient();
