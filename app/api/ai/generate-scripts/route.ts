@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildAutomationScriptPrompt, buildScriptPrompt, getOpenAIClient, safeJsonParse } from "@/lib/ai";
 import { sampleScript } from "@/lib/sample-data";
-import { samplePythonScript } from "@/lib/phase2-sample-data";
 import type { AutomationLanguage, GeneratedScript, TestCase } from "@/lib/types";
 import { generatePythonBddStepDefinitions } from "@/lib/generation/python-bdd";
 
@@ -113,7 +112,7 @@ export async function POST(request: Request) {
     const openai = getOpenAIClient();
     if (!openai) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY is not configured.", script: language === "python" ? samplePythonScript : sampleScript },
+        { error: "OPENAI_API_KEY is not configured.", script: sampleScript },
         { status: 503 }
       );
     }
