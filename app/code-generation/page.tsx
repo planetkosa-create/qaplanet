@@ -107,7 +107,7 @@ export default function CodeGenerationPage() {
       setScripts(nextScripts);
       writeJson(appStorageKeys.generatedScript, nextScript);
       writeJson(appStorageKeys.generatedAutomations, nextScripts);
-      setMessage(`Generated Playwright ${language === "python" ? "Python" : "TypeScript"} automation.`);
+      setMessage("Generated Playwright TypeScript automation.");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Script generation failed.";
       setMessage(errorMessage);
