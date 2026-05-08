@@ -12,6 +12,7 @@ import { GuidanceRail } from "@/components/layout/GuidanceRail";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient, hasSupabaseConfig } from "@/lib/supabase";
 import { getStoredProjectId } from "@/lib/project-context";
+import { loadSupabaseWorkspace, writeWorkspaceSnapshot } from "@/lib/workspace-sync";
 import { sampleRequirements } from "@/lib/sample-data";
 import { sampleRequirementSources } from "@/lib/phase2-sample-data";
 import type { RequirementSource } from "@/lib/types";
@@ -28,6 +29,19 @@ export default function UploadPage() {
   useEffect(() => {
     setManualText(readJson(appStorageKeys.requirements, sampleRequirements));
     setSources(readJson(appStorageKeys.requirementSources, sampleRequirementSources));
+
+    async function loadSavedWorkspace() {
+      const snapshot = await loadSupabaseWorkspace(getStoredProjectId());
+      if (!snapshot) {
+        return;
+      }
+
+      setManualText(snapshot.requirementSources.map((source) => source.extractedText).join("\n\n"));
+      setSources(snapshot.requirementSources);
+      writeWorkspaceSnapshot(snapshot);
+    }
+
+    void loadSavedWorkspace();
   }, []);
 
   const totalWords = useMemo(

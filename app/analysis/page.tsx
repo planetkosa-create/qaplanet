@@ -12,6 +12,7 @@ import { GuidanceRail } from "@/components/layout/GuidanceRail";
 import { appStorageKeys, readJson, writeJson } from "@/lib/storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { getStoredProjectId, isUuid } from "@/lib/project-context";
+import { loadSupabaseWorkspace, writeWorkspaceSnapshot } from "@/lib/workspace-sync";
 import { sampleAnalysisItems, sampleRequirementSources } from "@/lib/phase2-sample-data";
 import type { AnalysisItem, AnalysisItemType, RequirementSource } from "@/lib/types";
 
@@ -37,6 +38,19 @@ export default function AnalysisPage() {
   useEffect(() => {
     setSources(readJson(appStorageKeys.requirementSources, sampleRequirementSources));
     setItems(readJson(appStorageKeys.analysisItems, sampleAnalysisItems));
+
+    async function loadSavedWorkspace() {
+      const snapshot = await loadSupabaseWorkspace(getStoredProjectId());
+      if (!snapshot) {
+        return;
+      }
+
+      setSources(snapshot.requirementSources);
+      setItems(snapshot.analysisItems);
+      writeWorkspaceSnapshot(snapshot);
+    }
+
+    void loadSavedWorkspace();
   }, []);
 
   const grouped = useMemo(() => {

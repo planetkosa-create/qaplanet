@@ -17,6 +17,7 @@ import { buildCoverageSummary } from "@/lib/coverage";
 import type { AnalysisItem, Project, RequirementAnalysis, RequirementSource, TestCase, UploadedDocument } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { isUuid, sanitizeProject } from "@/lib/project-context";
+import { loadSupabaseWorkspace, syncLocalWorkflowToSupabase, writeWorkspaceSnapshot } from "@/lib/workspace-sync";
 
 const defaultProject: Project = {
   name: "",
@@ -58,38 +59,21 @@ export default function DashboardPage() {
     setDocuments(readJson(appStorageKeys.documents, []));
     setRequirementSources(readJson(appStorageKeys.requirementSources, []));
 
-    async function loadSupabaseProject() {
-      const supabase = createSupabaseBrowserClient();
-      if (!supabase) {
+    async function loadSupabaseProjectWorkspace() {
+      const snapshot = await loadSupabaseWorkspace(isUuid(storedProject.id) ? storedProject.id : undefined);
+      if (!snapshot) {
         return;
       }
 
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) {
-        return;
-      }
-
-      const result = await supabase
-        .from("projects")
-        .select("id, name, description, created_at")
-        .eq("owner_id", user.data.user.id)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (result.data) {
-        const savedProject: Project = {
-          id: result.data.id,
-          name: result.data.name,
-          description: result.data.description,
-          created_at: result.data.created_at
-        };
-        setProject(savedProject);
-        writeJson(appStorageKeys.project, savedProject);
-      }
+      setProject(snapshot.project);
+      setRequirementSources(snapshot.requirementSources);
+      setDocuments(snapshot.documents);
+      setAnalysisItems(snapshot.analysisItems);
+      setTestCases(snapshot.testCases);
+      writeWorkspaceSnapshot(snapshot);
     }
 
-    void loadSupabaseProject();
+    void loadSupabaseProjectWorkspace();
   }, []);
 
   useEffect(() => {
@@ -186,9 +170,19 @@ export default function DashboardPage() {
         }
 
         if (result.data) {
-          nextProject.id = result.data.id;
+          const savedProjectId = String(result.data.id);
+          nextProject.id = savedProjectId;
           nextProject.name = result.data.name;
           nextProject.description = result.data.description;
+          await syncLocalWorkflowToSupabase(savedProjectId);
+          const snapshot = await loadSupabaseWorkspace(savedProjectId);
+          if (snapshot) {
+            setRequirementSources(snapshot.requirementSources);
+            setDocuments(snapshot.documents);
+            setAnalysisItems(snapshot.analysisItems);
+            setTestCases(snapshot.testCases);
+            writeWorkspaceSnapshot(snapshot);
+          }
           nextMessage = "Project saved with Supabase project ID.";
         }
       } else {
