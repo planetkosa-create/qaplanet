@@ -164,3 +164,96 @@ export type ExportHistoryItem = {
   createdAt: string;
   rowCount?: number;
 };
+
+export type TeamRole = "Owner" | "Admin" | "QA Lead" | "Tester" | "Reviewer" | "Viewer";
+
+export type Organization = {
+  id: string;
+  name: string;
+  ownerId?: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type OrganizationMember = {
+  id: string;
+  organizationId: string;
+  name: string;
+  email: string;
+  role: TeamRole;
+  status: "Active" | "Pending";
+  createdAt: string;
+};
+
+export type Invitation = {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: TeamRole;
+  status: "Pending" | "Accepted" | "Revoked";
+  invitedBy?: string;
+  createdAt: string;
+  acceptedAt?: string;
+};
+
+export type PlanName = "Free" | "Pro" | "Team" | "Enterprise";
+
+export type Plan = {
+  id: string;
+  name: PlanName;
+  monthlyPrice: number;
+  maxProjects: number | "Unlimited";
+  maxDocuments: number | "Unlimited";
+  maxAiGenerations: number | "Unlimited";
+  maxTeamMembers: number | "Unlimited";
+  features: string[];
+};
+
+export type UsageEventType =
+  | "document_uploaded"
+  | "ai_analysis_run"
+  | "test_cases_generated"
+  | "automation_generated"
+  | "export_created"
+  | "package_generated";
+
+export type UsageEvent = {
+  id: string;
+  organizationId?: string;
+  projectId?: string;
+  userId?: string;
+  eventType: UsageEventType;
+  quantity: number;
+  createdAt: string;
+};
+
+export type TestRunResultStatus = "passed" | "failed" | "skipped";
+
+export type TestRunResult = {
+  id: string;
+  testRunId: string;
+  testCaseId?: string;
+  testCaseRef: string;
+  title: string;
+  status: TestRunResultStatus;
+  durationSeconds: number;
+  errorMessage?: string;
+  createdAt: string;
+};
+
+export type TestRun = {
+  id: string;
+  projectId?: string;
+  runName: string;
+  framework: string;
+  source: string;
+  totalTests: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  durationSeconds: number;
+  executedAt: string;
+  createdAt: string;
+  rawResults?: unknown;
+  results: TestRunResult[];
+};

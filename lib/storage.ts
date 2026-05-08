@@ -12,6 +12,11 @@ export const appStorageKeys = {
   selectedTestCases: "qaplanet.selectedTestCases",
   generatedScript: "qaplanet.generatedScript",
   exportHistory: "qaplanet.exportHistory",
+  organization: "qaplanet.organization",
+  organizationMembers: "qaplanet.organizationMembers",
+  invitations: "qaplanet.invitations",
+  usageEvents: "qaplanet.usageEvents",
+  testRuns: "qaplanet.testRuns",
   localDataCleared: "qaplanet.localDataCleared"
 } as const;
 

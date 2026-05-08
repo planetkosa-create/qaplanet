@@ -176,3 +176,150 @@ export function downloadTextFile(fileName: string, content: string, mimeType: st
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+export type TestManagementExportOptions = {
+  areaPath?: string;
+  iterationPath?: string;
+  tags?: string;
+  assignedTo?: string;
+};
+
+export function azureDevOpsTestCasesToCsv(testCases: TestCase[], options: TestManagementExportOptions = {}) {
+  const headers = [
+    "Title",
+    "Test Case ID",
+    "Requirement Reference",
+    "Priority",
+    "Test Type",
+    "Automation Status",
+    "Approval Status",
+    "Preconditions",
+    "Steps",
+    "Expected Result",
+    "Tags",
+    "Area Path",
+    "Iteration Path",
+    "Assigned To"
+  ];
+
+  const rows = testCases.map((testCase) => [
+    testCase.title ?? testCase.name,
+    testCase.testCaseId,
+    testCase.requirementReference,
+    testCase.priority,
+    testCase.testType ?? testCase.type,
+    testCase.automationStatus ?? testCase.readiness,
+    testCase.approvalStatus ?? testCase.status,
+    testCase.preconditions,
+    numberedSteps(testCase.steps),
+    testCase.expectedResult,
+    buildTags(testCase, options.tags),
+    options.areaPath ?? "",
+    options.iterationPath ?? "",
+    options.assignedTo ?? ""
+  ]);
+
+  return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+
+export function jiraTestCasesToCsv(testCases: TestCase[], options: TestManagementExportOptions = {}) {
+  const headers = [
+    "Summary",
+    "Issue Type",
+    "Description",
+    "Priority",
+    "Labels",
+    "Test Steps",
+    "Expected Result",
+    "Requirement Reference",
+    "Automation Status",
+    "Assignee"
+  ];
+
+  const rows = testCases.map((testCase) => [
+    `${testCase.testCaseId}: ${testCase.title ?? testCase.name}`,
+    "Test",
+    testCase.description,
+    testCase.priority,
+    buildTags(testCase, options.tags).replaceAll(";", ","),
+    numberedSteps(testCase.steps),
+    testCase.expectedResult,
+    testCase.requirementReference,
+    testCase.automationStatus ?? testCase.readiness,
+    options.assignedTo ?? ""
+  ]);
+
+  return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+
+export function xrayTestCasesToJson(testCases: TestCase[], options: TestManagementExportOptions = {}) {
+  return JSON.stringify(
+    {
+      tests: testCases.map((testCase) => ({
+        testInfo: {
+          summary: `${testCase.testCaseId}: ${testCase.title ?? testCase.name}`,
+          description: testCase.description,
+          priority: testCase.priority,
+          labels: buildTags(testCase, options.tags).split(";").filter(Boolean),
+          requirementReference: testCase.requirementReference,
+          automationStatus: testCase.automationStatus ?? testCase.readiness
+        },
+        steps: testCase.steps.map((step, index) => ({
+          action: step,
+          data: "",
+          result: index === testCase.steps.length - 1 ? testCase.expectedResult : ""
+        })),
+        expectedResult: testCase.expectedResult
+      }))
+    },
+    null,
+    2
+  );
+}
+
+export function markdownTestPlan(testCases: TestCase[], title = "QAplanet Test Plan") {
+  const byPriority = testCases.reduce<Record<string, number>>((accumulator, testCase) => {
+    accumulator[testCase.priority] = (accumulator[testCase.priority] ?? 0) + 1;
+    return accumulator;
+  }, {});
+
+  return [
+    `# ${title}`,
+    "",
+    "## Summary",
+    "",
+    `- Total test cases: ${testCases.length}`,
+    `- Critical: ${byPriority.Critical ?? 0}`,
+    `- High: ${byPriority.High ?? 0}`,
+    `- Medium: ${byPriority.Medium ?? 0}`,
+    `- Low: ${byPriority.Low ?? 0}`,
+    "",
+    "## Scope",
+    "",
+    "This plan was generated from QAplanet test cases and is intended for stakeholder review, QA execution planning, and test management import.",
+    "",
+    "## Test Cases",
+    "",
+    testCasesToMarkdown(testCases)
+  ].join("\n");
+}
+
+function numberedSteps(steps: string[]) {
+  return steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+}
+
+function buildTags(testCase: TestCase, extraTags?: string) {
+  const values = [
+    "qaplanet",
+    testCase.requirementReference,
+    testCase.priority,
+    testCase.testType ?? testCase.type,
+    testCase.automationStatus ?? testCase.readiness,
+    extraTags ?? ""
+  ]
+    .flatMap((value) => String(value).split(/[;,]/))
+    .map((value) => value.trim().replace(/\s+/g, "-").toLowerCase())
+    .filter(Boolean);
+
+  return Array.from(new Set(values)).join(";");
+}
