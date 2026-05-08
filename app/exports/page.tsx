@@ -387,7 +387,7 @@ export default function ExportsPage() {
           <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-bold text-slate-950">GitHub push coming soon</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Connect GitHub -> Select repository -> Create branch -> Commit automation package -> Open pull request.
+              {"Connect GitHub -> Select repository -> Create branch -> Commit automation package -> Open pull request."}
             </p>
           </div>
         </article>
