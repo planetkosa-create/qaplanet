@@ -1,6 +1,7 @@
 export const appStorageKeys = {
   project: "qaplanet.project",
   requirements: "qaplanet.requirements",
+  requirementDraft: "qaplanet.requirementDraft",
   analysis: "qaplanet.analysis",
   testCases: "qaplanet.testCases",
   documents: "qaplanet.documents",

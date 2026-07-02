@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, FileSpreadsheet, FileText, FileType2, Loader2, Send, UploadCloud } from "lucide-react";
+import { Bot, FileSpreadsheet, FileText, FileType2, Loader2, PencilLine, Send, Trash2, UploadCloud } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const allowedTypes = [".docx", ".pdf", ".xlsx", ".txt"];
 
 export default function UploadPage() {
   const [manualText, setManualText] = useState(sampleRequirements);
+  const [draftText, setDraftText] = useState("");
   const [sources, setSources] = useState<RequirementSource[]>(sampleRequirementSources);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -28,6 +29,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     setManualText(readJson(appStorageKeys.requirements, sampleRequirements));
+    setDraftText(readJson(appStorageKeys.requirementDraft, ""));
     setSources(readJson(appStorageKeys.requirementSources, sampleRequirementSources));
 
     async function loadSavedWorkspace() {
@@ -48,12 +50,33 @@ export default function UploadPage() {
     () => sources.map((source) => source.extractedText).join(" ").trim().split(/\s+/).filter(Boolean).length,
     [sources]
   );
+  const draftWords = useMemo(() => draftText.trim().split(/\s+/).filter(Boolean).length, [draftText]);
 
   function persist(nextSources: RequirementSource[]) {
     setSources(nextSources);
     writeJson(appStorageKeys.requirementSources, nextSources);
     writeJson(appStorageKeys.documents, nextSources);
     writeJson(appStorageKeys.requirements, nextSources.map((source) => source.extractedText).join("\n\n"));
+  }
+
+  function updateDraftText(value: string) {
+    setDraftText(value);
+    writeJson(appStorageKeys.requirementDraft, value);
+  }
+
+  function useDraftAsManualPaste() {
+    if (!draftText.trim()) {
+      setMessage("Draft something first, then move it into Manual Paste when you are ready.");
+      return;
+    }
+
+    setManualText(draftText);
+    setMessage("Draft copied into Manual Paste. Review it, then click Save Manual Source to commit it.");
+  }
+
+  function clearDraft() {
+    updateDraftText("");
+    setMessage("Draft workspace cleared. No requirement sources were changed.");
   }
 
   async function saveSourceToSupabase(source: RequirementSource): Promise<RequirementSource> {
@@ -125,6 +148,11 @@ export default function UploadPage() {
     const nextSources = [...sources];
 
     try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error("Sign in before extracting requirement documents.");
+      }
+
       for (const file of Array.from(files)) {
         const extension = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`;
         if (!allowedTypes.includes(extension)) {
@@ -149,6 +177,7 @@ export default function UploadPage() {
         formData.append("file", file);
         const response = await fetch("/api/documents/extract", {
           method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
           body: formData
         });
         const data = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
@@ -223,6 +252,38 @@ export default function UploadPage() {
           </div>
 
           <div className="card p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <PencilLine className="size-5 text-brand-blue" aria-hidden />
+                  <h2 className="text-lg font-semibold text-slate-950">Draft Workspace</h2>
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Draft requirements, notes, acceptance criteria, or rough ideas here before committing them as a requirement source.
+                </p>
+              </div>
+              <Badge tone="blue">{draftWords} words</Badge>
+            </div>
+            <Textarea
+              className="mt-4 min-h-72 font-mono text-xs"
+              value={draftText}
+              onChange={(event) => updateDraftText(event.target.value)}
+              placeholder="Draft freely here. This area is autosaved locally and does not affect analysis until you move it into Manual Paste and save it."
+            />
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500">Autosaved in this browser. Not committed to the project yet.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={clearDraft} disabled={!draftText.trim()} icon={<Trash2 className="size-4" aria-hidden />}>
+                  Clear Draft
+                </Button>
+                <Button onClick={useDraftAsManualPaste} disabled={!draftText.trim()} icon={<FileText className="size-4" aria-hidden />}>
+                  Use Draft as Manual Paste
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-950">Manual Paste</h2>
               <Badge tone="blue">{manualText.trim().split(/\s+/).filter(Boolean).length} words</Badge>
@@ -273,4 +334,11 @@ export default function UploadPage() {
       </section>
     </AppShell>
   );
+}
+
+async function getAccessToken() {
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) return "";
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? "";
 }
